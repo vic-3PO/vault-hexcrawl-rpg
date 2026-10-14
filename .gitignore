@@ -1,0 +1,19 @@
+# Obsidian: estado local do workspace
+.obsidian/workspace*.json
+.obsidian/cache
+.trash/
+
+# Obsidian: binários dos plugins (cada pessoa instala pelo próprio Obsidian).
+# Mantemos só as configurações (data.json) e a lista de plugins.
+.obsidian/plugins/*/main.js
+.obsidian/plugins/*/styles.css
+.obsidian/plugins/*/manifest.json
+
+# Sistema operacional
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Ferramentas locais (Claude Code, graphify)
+.claude/
+graphify-out/
