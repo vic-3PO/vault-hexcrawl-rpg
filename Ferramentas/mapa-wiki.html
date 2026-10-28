@@ -1,0 +1,507 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mapa Wiki</title>
+<link rel="stylesheet" href="tema.css">
+<style>
+  html, body { height: 100%; } body { display: flex; flex-direction: column; overflow: hidden; }
+  main { flex: 1; display: flex; min-height: 0; }
+
+  /* o mapa é o protagonista: uma cartolina sobre a mesa de feltro */
+  #viewport { flex: 1; position: relative; overflow: hidden; cursor: grab; touch-action: none; background-color: var(--feltro-2);
+    background-image: linear-gradient(rgb(0 0 0 / .22), rgb(0 0 0 / .22)), linear-gradient(var(--veu-mesa), var(--veu-mesa)), url("img/web/feltro.webp"), var(--fibra), radial-gradient(ellipse 70% 60% at 50% 45%, rgb(255 255 255 / .06), transparent 75%);
+    background-size: auto, auto, 300px, 200px, auto; }
+  #viewport.panning { cursor: grabbing; } #viewport.adding { cursor: crosshair; }
+  #stage { position: absolute; left: 0; top: 0; transform-origin: 0 0; }
+  #stage img { display: block; max-width: none; user-select: none; -webkit-user-drag: none; background: var(--papel);
+    box-shadow: 0 0 0 14px var(--papel-3), 0 0 0 15px var(--risco), 0 30px 70px rgb(0 0 0 / .65); }
+  #hex { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+  #hex path { stroke: #1b1208; stroke-opacity: .62; stroke-linejoin: round; stroke-linecap: round; }
+  #empty { position: absolute; inset: 0; display: grid; place-items: center; padding: 24px; pointer-events: none; }
+  #empty .vazio { max-width: 30rem; }
+
+  /* marcadores: selos de cera que pousam no mapa */
+  .marker { position: absolute; width: 0; height: 0; transform: scale(var(--inv, 1)); transform-origin: 0 0; }
+  .marker { filter: drop-shadow(0 3px 3px rgb(0 0 0 / .55)); }
+  .marker .pin { position: absolute; left: -17px; top: -17px; width: 34px; height: 34px; cursor: pointer; animation: pousa .3s cubic-bezier(.3, 1.6, .5, 1) both; }
+  /* base de contingência: sem a imagem do selo, sobra um disco com a cor da categoria */
+  .marker .pin::before { content: ""; position: absolute; inset: 5px; border-radius: 50%;
+    background: radial-gradient(circle at 34% 28%, color-mix(in srgb, var(--c) 55%, #fff), var(--c) 55%, color-mix(in srgb, var(--c) 68%, #000)); box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--c) 70%, #000); }
+  .marker .pin::after { content: ""; position: absolute; inset: 0; background: url("img/web/selo.webp") center / 100% 100% no-repeat; }
+  /* o selo é vermelho; cada categoria gira o matiz (a cor do marcador vem do estilo inline --c) */
+  .marker[style*="#c98a1e"] .pin::after { filter: hue-rotate(38deg) saturate(.95) brightness(1.15); }   /* local */
+  .marker[style*="#2f6fa8"] .pin::after { filter: hue-rotate(205deg) saturate(.95); }                    /* cidade */
+  .marker[style*="#7a4fa6"] .pin::after { filter: hue-rotate(268deg) saturate(.8); }                     /* facção */
+  .marker[style*="#3f7d3a"] .pin::after { filter: hue-rotate(112deg) saturate(.85) brightness(.95); }    /* missão */
+  .marker[style*="#c4527f"] .pin::after { filter: hue-rotate(335deg) saturate(.9) brightness(1.1); }     /* npc */
+  .marker[style*="#6b6b6b"] .pin::after { filter: saturate(0) brightness(.85); }                          /* outro */
+  .marker .ico { background: none; -webkit-mask: none; mask: none; position: absolute; left: -17px; top: -17px; width: 34px; height: 34px; display: grid; place-items: center;
+    font: 700 15px/1 var(--f-titulo); color: #fff; text-shadow: 0 1px 1px rgb(0 0 0 / .6); pointer-events: none; }
+  .marker .lbl { position: absolute; left: 0; top: 21px; transform: translateX(-50%); white-space: nowrap; pointer-events: none;
+    font: 600 12px/1.3 var(--f-titulo); color: var(--tinta); background: var(--papel-3); padding: 1px 8px; border-radius: 2px; box-shadow: 0 1px 0 var(--risco), 0 3px 6px rgb(0 0 0 / .4); }
+  .marker.sel { filter: drop-shadow(0 0 1.5px #fff) drop-shadow(0 0 1.5px #fff) drop-shadow(0 3px 3px rgb(0 0 0 / .55)); }
+  .marker.dim { opacity: .22; }
+  #viewport.nolabels .marker .lbl { display: none; }
+  @keyframes pousa { from { transform: translateY(-16px) scale(1.3); opacity: 0; } to { transform: none; opacity: 1; } }
+
+  /* painel lateral: folha de caderno com margem, como uma anotação */
+  aside { width: 320px; display: flex; flex-direction: column; min-height: 0; position: relative; z-index: 2;
+    background-color: var(--papel);
+    background-image: linear-gradient(90deg, transparent 33px, rgb(168 48 31 / .4) 33px 34px, transparent 34px), repeating-linear-gradient(transparent 0 27px, var(--regua) 27px 28px), var(--grao);
+    box-shadow: -12px 0 26px -10px rgb(0 0 0 / .65), -1px 0 0 var(--risco); }
+  aside section { padding: .9rem 1rem .9rem 2.9rem; border-bottom: 1px dashed var(--risco); }
+  aside h2 { font-size: 1.05rem; }
+  .layers { display: flex; flex-wrap: wrap; gap: .1rem .8rem; }
+  .layers label { display: inline-flex; align-items: center; gap: .35rem; margin: 0; font: .88rem var(--f-corpo); font-style: normal; color: var(--tinta); cursor: pointer; }
+  .dot { display: inline-block; flex: none; width: 11px; height: 11px; border-radius: 50%; box-shadow: inset 0 0 0 2px rgb(0 0 0 / .28); }
+  #search { margin-top: .6rem; width: 100%; }
+  #editor { display: none; max-height: 58%; overflow: auto; } #editor.show { display: block; }
+  #editor input, #editor select { width: 100%; }
+  #editor textarea { min-height: 130px; font-family: var(--f-mao); font-size: .85rem; line-height: 1.5; }
+  #list { overflow: auto; flex: 1; padding-top: .3rem; border-bottom: 0; }
+  #list .item { display: flex; align-items: center; gap: .55rem; padding: .22rem .3rem; cursor: pointer; font-family: var(--f-titulo); }
+  #list .item:hover { background: var(--regua); } #list .item.sel { background: color-mix(in srgb, var(--acento) 16%, transparent); font-weight: 700; }
+  #listTitle { margin: 0; }
+  .md h1, .md h2, .md h3 { font-size: 1.02rem; margin: .5em 0 .2em; display: block; } .md h2::after { display: none; }
+  .md p { margin: .35em 0; } .md ul { margin: .3em 0; padding-left: 1.2em; } .md a { color: var(--acento); }
+  #preview { background: var(--papel-3); border: 1px dashed var(--risco); padding: .2rem .8rem; margin-top: .5rem; font-family: var(--f-titulo); font-size: .92rem; }
+  @media (max-width: 760px) { main { flex-direction: column; } aside { width: 100%; max-height: 45%; } }
+</style>
+</head>
+<body>
+<header>
+  <h1><span class="ico i-mapa"></span>Mapa Wiki</h1>
+  <button id="btnImg"><span class="ico i-pasta"></span>Abrir mapa…</button>
+  <input id="fileImg" type="file" accept="image/*" hidden>
+  <select id="selMapa" title="Mapas já abertos neste navegador ou na pasta de autosave" style="width:auto;max-width:200px" hidden></select>
+  <button id="btnAdd" title="Com o modo ativo, um clique no mapa cria um marcador (ou use duplo clique a qualquer momento)"><span class="ico i-mais"></span>Marcador</button>
+  <span class="sep"></span>
+  <button id="btnHex" title="Mostrar grade hexagonal"><span class="ico i-hex"></span>Grade</button>
+  <button id="btnLbl" class="on" title="Mostrar nomes">Nomes</button>
+  <button id="btnFit" title="Ajustar à tela">Ajustar</button>
+  <span class="spacer"></span>
+  <span id="status"></span>
+  <button id="btnImport">Importar JSON</button>
+  <input id="fileJson" type="file" accept=".json,application/json" hidden>
+  <button id="btnExport">Exportar JSON</button>
+  <button id="btnMd" title="Gera uma nota .md para colar no vault">Exportar .md</button>
+  <button id="btnCfg" title="Configurações" aria-label="Configurações"><span class="ico i-ajustes"></span></button>
+</header>
+
+<main>
+  <div id="viewport">
+    <div id="stage">
+      <img id="img" alt="">
+      <svg id="hex"></svg>
+      <div id="markers"></div>
+    </div>
+    <div id="empty"><div class="vazio">
+      <p>Abra a imagem do seu mapa</p>
+      <p>Clique em <b>Abrir mapa…</b> ou arraste um arquivo de imagem para cá.<br>
+      Depois: duplo clique cria um marcador · arraste para mover · roda do mouse dá zoom.</p>
+    </div></div>
+  </div>
+
+  <aside>
+    <section>
+      <h2>Camadas</h2>
+      <div class="layers" id="layers"></div>
+      <input id="search" type="search" placeholder="Buscar marcador…" style="margin-top:10px">
+    </section>
+    <section id="editor">
+      <h2>Marcador</h2>
+      <label>Título</label><input id="eTitle" type="text">
+      <div class="row">
+        <div><label>Categoria</label><select id="eCat"></select></div>
+        <div><label>Ícone</label><input id="eIcon" type="text" maxlength="4"></div>
+      </div>
+      <label>Nota do vault (opcional)</label><input id="eNote" type="text" placeholder="ex.: Boca Fria">
+      <label>Descrição (markdown simples, aceita [[links]])</label><textarea id="eDesc"></textarea>
+      <div id="preview" class="md"></div>
+      <div class="row" style="margin-top:10px">
+        <button id="eOpen">Abrir no Obsidian</button>
+        <button id="eDel" class="danger">Excluir</button>
+      </div>
+    </section>
+    <section style="padding-bottom:0"><h2 id="listTitle">Marcadores</h2></section>
+    <section id="list"></section>
+  </aside>
+</main>
+
+<dialog id="dlgCfg">
+  <form method="dialog">
+    <h3 style="margin-top:0">Configurações</h3>
+    <label>Nome do vault no Obsidian (para os links obsidian://)</label>
+    <input id="cVault" type="text" placeholder="base-campanha">
+    <label>Tamanho do hexágono (px na imagem original)</label>
+    <input id="cHex" type="number" min="10" max="600" value="80">
+    <label>Mover a grade (desloca X / Y)</label>
+    <div class="row"><input id="cHexX" type="number" value="0"><input id="cHexY" type="number" value="0"></div>
+    <p style="color:var(--muted);font-size:12px">Os dados ficam salvos neste navegador, por nome de arquivo do mapa. Use Exportar JSON para guardar no vault ou compartilhar.</p>
+    <div class="row" style="margin-top:12px"><button value="ok">Fechar</button></div>
+  </form>
+</dialog>
+
+<script src="autosave.js" data-tool="mapa-wiki" data-idb="mapa-wiki-imagens"></script>
+<script>
+(() => {
+  'use strict';
+  const CATS = {
+    local:   { nome: 'Local',   cor: '#c98a1e', icone: '◆' },
+    cidade:  { nome: 'Cidade',  cor: '#2f6fa8', icone: '⌂' },
+    faccao:  { nome: 'Facção',  cor: '#7a4fa6', icone: '⚑' },
+    missao:  { nome: 'Missão',  cor: '#3f7d3a', icone: '!' },
+    perigo:  { nome: 'Perigo',  cor: '#a8301f', icone: '✕' },
+    npc:     { nome: 'NPC',     cor: '#c4527f', icone: '♙' },
+    outro:   { nome: 'Outro',   cor: '#6b6b6b', icone: '•' },
+  };
+  const $ = id => document.getElementById(id);
+  const vp = $('viewport'), stage = $('stage'), img = $('img'), mk = $('markers');
+
+  let state = { mapa: '', vault: '', hex: { tam: 80, x: 0, y: 0, ver: false }, marcadores: [] };
+  let view = { x: 0, y: 0, k: 1 };
+  let imgW = 0, imgH = 0, addMode = false, selId = null, hidden = new Set();
+
+  const storeKey = () => 'mapa-wiki:' + (state.mapa || '_');
+  const save = () => { try { localStorage.setItem(storeKey(), JSON.stringify(state)); } catch (e) {} flash('salvo'); };
+  const load = nome => { try { return JSON.parse(localStorage.getItem('mapa-wiki:' + nome)); } catch (e) { return null; } };
+  let flashT; const flash = t => { $('status').textContent = t; clearTimeout(flashT); flashT = setTimeout(() => $('status').textContent = '', 1500); };
+  const uid = () => 'm' + Math.random().toString(36).slice(2, 9);
+  const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+
+  /* ---------- carregar imagem ---------- */
+  /* A imagem fica guardada em dois lugares: IndexedDB (cache do navegador, aceita arquivos grandes)
+     e, com o autosave ligado, uma cópia em autosave/mapa-wiki.img.<nome>. */
+  const IMG_PREFIX = 'mapa-wiki.img.';
+  let imgBlob = null;
+  const idbImg = () => new Promise((ok, no) => {
+    const r = indexedDB.open('mapa-wiki-imagens', 1); r.onupgradeneeded = () => r.result.createObjectStore('img');
+    r.onsuccess = () => ok(r.result); r.onerror = () => no(r.error);
+  });
+  const idbOp = async (modo, fn) => { const db = await idbImg(); return new Promise((ok, no) => { const q = fn(db.transaction('img', modo).objectStore('img')); q.onsuccess = () => ok(q.result); q.onerror = () => no(q.error); }); };
+  const guardaLocal = (nome, blob) => idbOp('readwrite', s => s.put({ nome, blob, quando: Date.now() }, nome)).catch(() => {});
+  const leLocal = nome => idbOp('readonly', s => s.get(nome)).then(v => v && v.blob).catch(() => null);
+  const ultimoLocal = () => idbOp('readonly', s => s.getAll()).then(l => l.sort((a, b) => b.quando - a.quando)[0]?.nome ?? null).catch(() => null);
+  const guardaCopia = async nome => {
+    if (!imgBlob || !window.Autosave || !Autosave.ativo()) return;
+    if (await Autosave.gravaArquivo(IMG_PREFIX + nome, imgBlob)) flash('imagem copiada para a pasta de autosave');
+  };
+
+  function abreBlob(blob, nome, persistir) {
+    const url = URL.createObjectURL(blob);
+    img.onload = () => {
+      imgW = img.naturalWidth; imgH = img.naturalHeight; imgBlob = blob;
+      stage.style.width = imgW + 'px'; stage.style.height = imgH + 'px';
+      const prev = load(nome);
+      state = prev || { mapa: nome, vault: state.vault, hex: { tam: 80, x: 0, y: 0, ver: false }, marcadores: [] };
+      state.mapa = nome;
+      $('empty').style.display = 'none';
+      selId = null; fit(); renderAll(); syncCfg();
+      try { localStorage.setItem('mapa-wiki:_ultimo', nome); } catch (e) {}
+      if (persistir) { guardaLocal(nome, blob); guardaCopia(nome); }
+      listaMapas();
+      flash(prev ? 'dados do mapa restaurados' : 'mapa carregado');
+    };
+    img.src = url;
+  }
+  function openImage(file) {
+    if (!file || !file.type.startsWith('image/')) return;
+    abreBlob(file, file.name, true);
+  }
+  window.addEventListener('autosave-conectado', () => guardaCopia(state.mapa));
+
+  /* lista de mapas já abertos (navegador + pasta de autosave) */
+  async function nomesSalvos() {
+    const nomes = new Set(await idbOp('readonly', s => s.getAllKeys()).catch(() => []));
+    if (window.Autosave && Autosave.ativo()) (await Autosave.lista(IMG_PREFIX)).forEach(n => nomes.add(n.slice(IMG_PREFIX.length)));
+    return [...nomes].sort((a, b) => a.localeCompare(b, 'pt'));
+  }
+  async function listaMapas() {
+    const nomes = await nomesSalvos(), sel = $('selMapa');
+    sel.innerHTML = '<option value="">Mapas salvos…</option>' + nomes.map(n => `<option ${n === state.mapa ? 'selected' : ''}>${esc(n)}</option>`).join('');
+    sel.hidden = !nomes.length;
+  }
+  async function carregaSalvo(nome) {
+    let blob = await leLocal(nome);
+    if (!blob && window.Autosave && Autosave.ativo()) { blob = await Autosave.leArquivo(IMG_PREFIX + nome); if (blob) guardaLocal(nome, blob); }
+    if (blob) { abreBlob(blob, nome, false); guardaLocal(nome, blob); }   // regrava para marcar como o mais recente
+    else flash('imagem não encontrada — abra o arquivo de novo');
+  }
+  $('selMapa').onchange = e => { if (e.target.value) carregaSalvo(e.target.value); };
+
+  /* ao abrir a página, volta ao último mapa */
+  (async () => {
+    let ultimo = null; try { ultimo = localStorage.getItem('mapa-wiki:_ultimo'); } catch (e) {}
+    if (window.Autosave) await Autosave.pronto;
+    ultimo = ultimo || await ultimoLocal();
+    if (ultimo) await carregaSalvo(ultimo); else listaMapas();
+  })();
+  $('btnImg').onclick = () => $('fileImg').click();
+  $('fileImg').onchange = e => openImage(e.target.files[0]);
+  ['dragover', 'drop'].forEach(ev => vp.addEventListener(ev, e => {
+    e.preventDefault();
+    if (ev === 'drop') {
+      const f = e.dataTransfer.files[0];
+      if (f && f.name.endsWith('.json')) importJson(f); else openImage(f);
+    }
+  }));
+
+  /* ---------- zoom / pan ---------- */
+  function applyView() {
+    stage.style.transform = `translate(${view.x}px,${view.y}px) scale(${view.k})`;
+    stage.style.setProperty('--inv', 1 / view.k);
+  }
+  function fit() {
+    if (!imgW) return;
+    const r = vp.getBoundingClientRect();
+    view.k = Math.min(r.width / imgW, r.height / imgH) * 0.96;
+    view.x = (r.width - imgW * view.k) / 2; view.y = (r.height - imgH * view.k) / 2;
+    applyView();
+  }
+  $('btnFit').onclick = fit;
+  window.addEventListener('resize', () => imgW && fit());
+  vp.addEventListener('wheel', e => {
+    if (!imgW) return; e.preventDefault();
+    const r = vp.getBoundingClientRect(), px = e.clientX - r.left, py = e.clientY - r.top;
+    const nk = Math.min(8, Math.max(0.05, view.k * Math.exp(-e.deltaY * 0.0015)));
+    view.x = px - (px - view.x) * (nk / view.k); view.y = py - (py - view.y) * (nk / view.k);
+    view.k = nk; applyView();
+  }, { passive: false });
+
+  let pan = null, drag = null, moved = false;
+  vp.addEventListener('pointerdown', e => {
+    if (!imgW || e.button !== 0) return;
+    const pin = e.target.closest('.marker');
+    moved = false;
+    if (pin) {
+      drag = { id: pin.dataset.id, sx: e.clientX, sy: e.clientY };
+      select(drag.id, true);
+    } else {
+      pan = { sx: e.clientX, sy: e.clientY, ox: view.x, oy: view.y };
+      vp.classList.add('panning');
+    }
+    vp.setPointerCapture(e.pointerId);
+  });
+  vp.addEventListener('pointermove', e => {
+    if (drag) {
+      if (Math.abs(e.clientX - drag.sx) + Math.abs(e.clientY - drag.sy) > 3) moved = true;
+      if (!moved) return;
+      const m = state.marcadores.find(m => m.id === drag.id), p = toMap(e.clientX, e.clientY);
+      m.x = clamp(p.x); m.y = clamp(p.y); placeMarker(m);
+    } else if (pan) {
+      if (Math.abs(e.clientX - pan.sx) + Math.abs(e.clientY - pan.sy) > 3) moved = true;
+      view.x = pan.ox + e.clientX - pan.sx; view.y = pan.oy + e.clientY - pan.sy; applyView();
+    }
+  });
+  vp.addEventListener('pointerup', e => {
+    if (drag && moved) save();
+    if (!drag && pan && !moved) {
+      if (addMode) addAt(e.clientX, e.clientY); else select(null);
+    }
+    pan = drag = null; vp.classList.remove('panning');
+  });
+  vp.addEventListener('dblclick', e => { if (imgW && !e.target.closest('.marker')) addAt(e.clientX, e.clientY); });
+
+  const clamp = v => Math.min(1, Math.max(0, v));
+  function toMap(cx, cy) {
+    const r = stage.getBoundingClientRect();
+    return { x: (cx - r.left) / r.width, y: (cy - r.top) / r.height };
+  }
+
+  /* ---------- marcadores ---------- */
+  function addAt(cx, cy) {
+    const p = toMap(cx, cy);
+    if (p.x < 0 || p.x > 1 || p.y < 0 || p.y > 1) return;
+    const m = { id: uid(), x: p.x, y: p.y, titulo: 'Novo marcador', cat: 'local', icone: CATS.local.icone, nota: '', desc: '' };
+    state.marcadores.push(m); setAdd(false); renderAll(); select(m.id); save();
+    $('eTitle').focus(); $('eTitle').select();
+  }
+  function setAdd(v) { addMode = v; $('btnAdd').classList.toggle('on', v); vp.classList.toggle('adding', v); }
+  $('btnAdd').onclick = () => setAdd(!addMode);
+
+  function placeMarker(m) {
+    let el = mk.querySelector(`[data-id="${m.id}"]`);
+    if (!el) {
+      el = document.createElement('div'); el.className = 'marker'; el.dataset.id = m.id;
+      el.innerHTML = '<div class="pin"></div><div class="ico"></div><div class="lbl"></div>';
+      mk.appendChild(el);
+    }
+    const c = CATS[m.cat] || CATS.outro;
+    el.style.left = m.x * 100 + '%'; el.style.top = m.y * 100 + '%';
+    el.style.setProperty('--c', c.cor);
+    el.querySelector('.ico').textContent = m.icone || c.icone;
+    el.querySelector('.lbl').textContent = m.titulo;
+    el.classList.toggle('sel', m.id === selId);
+    el.style.display = hidden.has(m.cat) ? 'none' : '';
+    const q = $('search').value.trim().toLowerCase();
+    el.classList.toggle('dim', !!q && !(m.titulo + ' ' + m.desc).toLowerCase().includes(q));
+  }
+  function renderMarkers() {
+    const ids = new Set(state.marcadores.map(m => m.id));
+    mk.querySelectorAll('.marker').forEach(el => { if (!ids.has(el.dataset.id)) el.remove(); });
+    state.marcadores.forEach(placeMarker);
+  }
+  function renderList() {
+    const q = $('search').value.trim().toLowerCase();
+    const items = state.marcadores.filter(m => !hidden.has(m.cat) && (!q || (m.titulo + ' ' + m.desc).toLowerCase().includes(q)))
+      .sort((a, b) => a.titulo.localeCompare(b.titulo, 'pt'));
+    $('listTitle').textContent = `Marcadores (${items.length})`;
+    $('list').innerHTML = items.map(m => `<div class="item ${m.id === selId ? 'sel' : ''}" data-id="${m.id}">
+      <span class="dot" style="background:${(CATS[m.cat] || CATS.outro).cor}"></span>${esc(m.titulo)}</div>`).join('')
+      || '<div class="item" style="color:var(--muted);cursor:default">Nenhum marcador.</div>';
+  }
+  $('list').onclick = e => {
+    const it = e.target.closest('.item[data-id]'); if (!it) return;
+    select(it.dataset.id); centerOn(it.dataset.id);
+  };
+  function centerOn(id) {
+    const m = state.marcadores.find(m => m.id === id); if (!m) return;
+    const r = vp.getBoundingClientRect();
+    view.x = r.width / 2 - m.x * imgW * view.k; view.y = r.height / 2 - m.y * imgH * view.k; applyView();
+  }
+
+  function renderLayers() {
+    $('layers').innerHTML = Object.entries(CATS).map(([k, c]) =>
+      `<label><input type="checkbox" data-cat="${k}" ${hidden.has(k) ? '' : 'checked'}>
+       <span class="dot" style="background:${c.cor}"></span>${c.nome}</label>`).join('');
+  }
+  $('layers').onchange = e => {
+    const k = e.target.dataset.cat; if (!k) return;
+    e.target.checked ? hidden.delete(k) : hidden.add(k); renderMarkers(); renderList();
+  };
+  $('search').oninput = () => { renderMarkers(); renderList(); };
+  $('eCat').innerHTML = Object.entries(CATS).map(([k, c]) => `<option value="${k}">${c.nome}</option>`).join('');
+
+  /* ---------- editor ---------- */
+  function select(id, keepScroll) {
+    selId = id;
+    const m = state.marcadores.find(m => m.id === id);
+    $('editor').classList.toggle('show', !!m);
+    if (m) {
+      $('eTitle').value = m.titulo; $('eCat').value = m.cat; $('eIcon').value = m.icone || '';
+      $('eNote').value = m.nota || ''; $('eDesc').value = m.desc || ''; renderPreview(m);
+    }
+    renderMarkers(); renderList();
+  }
+  const current = () => state.marcadores.find(m => m.id === selId);
+  function bindField(el, key, after) {
+    el.addEventListener('input', () => {
+      const m = current(); if (!m) return;
+      m[key] = el.value;
+      if (key === 'cat' && !m.icone) m.icone = CATS[m.cat].icone;
+      placeMarker(m); renderList(); renderPreview(m); save(); after && after(m);
+    });
+  }
+  bindField($('eTitle'), 'titulo'); bindField($('eIcon'), 'icone'); bindField($('eNote'), 'nota'); bindField($('eDesc'), 'desc');
+  $('eCat').addEventListener('change', () => {
+    const m = current(); if (!m) return;
+    const old = CATS[m.cat] || CATS.outro; m.cat = $('eCat').value;
+    if (!m.icone || m.icone === old.icone) { m.icone = CATS[m.cat].icone; $('eIcon').value = m.icone; }
+    placeMarker(m); renderList(); save();
+  });
+  $('eDel').onclick = () => {
+    const m = current(); if (!m || !confirm(`Excluir "${m.titulo}"?`)) return;
+    state.marcadores = state.marcadores.filter(x => x !== m); selId = null;
+    $('editor').classList.remove('show'); renderAll(); save();
+  };
+  $('eOpen').onclick = () => {
+    const m = current(); if (!m) return;
+    const alvo = m.nota || m.titulo; if (!state.vault) { $('dlgCfg').showModal(); return; }
+    location.href = obsidianUrl(alvo);
+  };
+  const obsidianUrl = nota => `obsidian://open?vault=${encodeURIComponent(state.vault)}&file=${encodeURIComponent(nota)}`;
+
+  /* markdown mínimo e seguro: escapa primeiro, depois formata */
+  function md(src) {
+    const lines = esc(src).split('\n'); let out = '', list = false;
+    const inline = s => s
+      .replace(/\[\[([^\]|]+)(?:\|([^\]]+))?\]\]/g, (_, n, a) => state.vault
+        ? `<a href="${obsidianUrl(n.replace(/&amp;/g, '&'))}">${a || n}</a>` : `<b>${a || n}</b>`)
+      .replace(/\*\*(.+?)\*\*/g, '<b>$1</b>').replace(/\*(.+?)\*/g, '<i>$1</i>').replace(/`(.+?)`/g, '<code>$1</code>');
+    for (const l of lines) {
+      let m;
+      if ((m = l.match(/^(#{1,3})\s+(.*)/))) { if (list) { out += '</ul>'; list = false; } out += `<h${m[1].length}>${inline(m[2])}</h${m[1].length}>`; }
+      else if ((m = l.match(/^\s*[-*]\s+(.*)/))) { if (!list) { out += '<ul>'; list = true; } out += `<li>${inline(m[1])}</li>`; }
+      else { if (list) { out += '</ul>'; list = false; } if (l.trim()) out += `<p>${inline(l)}</p>`; }
+    }
+    return out + (list ? '</ul>' : '');
+  }
+  function renderPreview(m) { $('preview').innerHTML = md(m.desc) || '<span style="color:var(--muted)">Sem descrição.</span>'; }
+
+  /* ---------- grade hexagonal (pointy-top) ---------- */
+  function renderHex() {
+    const svg = $('hex'); const h = state.hex;
+    if (!h.ver || !imgW) { svg.innerHTML = ''; return; }
+    const s = h.tam, w = Math.sqrt(3) * s, v = 1.5 * s;
+    svg.setAttribute('viewBox', `0 0 ${imgW} ${imgH}`);
+    let d = '';
+    for (let row = -1; row * v < imgH + s; row++) {
+      for (let col = -1; col * w < imgW + w; col++) {
+        const cx = col * w + (row & 1 ? w / 2 : 0) + h.x, cy = row * v + h.y;
+        const pts = [0, 1, 2, 3, 4, 5].map(i => { const a = Math.PI / 180 * (60 * i - 30); return `${(cx + s * Math.cos(a)).toFixed(1)} ${(cy + s * Math.sin(a)).toFixed(1)}`; });
+        d += 'M' + pts.join('L') + 'Z';
+      }
+    }
+    svg.innerHTML = `<path d="${d}" fill="none" stroke="#fff" stroke-opacity=".35" stroke-width="${Math.max(1, s / 40)}"/>`;
+  }
+  $('btnHex').onclick = () => { state.hex.ver = !state.hex.ver; $('btnHex').classList.toggle('on', state.hex.ver); renderHex(); save(); };
+  $('btnLbl').onclick = () => { vp.classList.toggle('nolabels'); $('btnLbl').classList.toggle('on'); };
+  ['cHex', 'cHexX', 'cHexY'].forEach(id => $(id).addEventListener('input', () => {
+    state.hex.tam = Math.max(10, +$('cHex').value || 80); state.hex.x = +$('cHexX').value || 0; state.hex.y = +$('cHexY').value || 0;
+    renderHex(); save();
+  }));
+  $('cVault').addEventListener('input', () => { state.vault = $('cVault').value.trim(); try { localStorage.setItem('mapa-wiki:_vault', state.vault); } catch (e) {} save(); });
+  $('btnCfg').onclick = () => $('dlgCfg').showModal();
+  function syncCfg() {
+    if (!state.vault) { try { state.vault = localStorage.getItem('mapa-wiki:_vault') || ''; } catch (e) {} }
+    $('cVault').value = state.vault || ''; $('cHex').value = state.hex.tam; $('cHexX').value = state.hex.x; $('cHexY').value = state.hex.y;
+    $('btnHex').classList.toggle('on', !!state.hex.ver);
+  }
+
+  /* ---------- importar / exportar ---------- */
+  function download(nome, texto, tipo) {
+    const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([texto], { type: tipo })); a.download = nome; a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+  }
+  const baseName = () => (state.mapa || 'mapa').replace(/\.[^.]+$/, '');
+  $('btnExport').onclick = () => download(baseName() + '.mapa.json', JSON.stringify({ versao: 1, ...state }, null, 2), 'application/json');
+  $('btnImport').onclick = () => $('fileJson').click();
+  $('fileJson').onchange = e => importJson(e.target.files[0]);
+  function importJson(file) {
+    if (!file) return;
+    file.text().then(t => {
+      const d = JSON.parse(t);
+      if (!Array.isArray(d.marcadores)) throw new Error('arquivo sem marcadores');
+      state = { mapa: d.mapa || state.mapa, vault: d.vault || state.vault, hex: { tam: 80, x: 0, y: 0, ver: false, ...(d.hex || {}) }, marcadores: d.marcadores };
+      selId = null; $('editor').classList.remove('show'); syncCfg(); renderAll(); save();
+      flash(`${state.marcadores.length} marcadores importados` + (imgW ? '' : ' — abra a imagem do mapa'));
+    }).catch(err => alert('JSON inválido: ' + err.message));
+  }
+  $('btnMd').onclick = () => {
+    const porCat = {};
+    state.marcadores.forEach(m => (porCat[m.cat] ||= []).push(m));
+    let out = `---\ntipo: mapa\nmapa: ${state.mapa}\n---\n\n# Marcadores — ${baseName()}\n\n`;
+    for (const [k, lista] of Object.entries(porCat)) {
+      out += `## ${(CATS[k] || CATS.outro).nome}\n\n`;
+      lista.sort((a, b) => a.titulo.localeCompare(b.titulo, 'pt')).forEach(m => {
+        out += `### ${m.icone || ''} ${m.nota ? `[[${m.nota}]]` : m.titulo}\n`;
+        out += `*posição: ${(m.x * 100).toFixed(1)}% / ${(m.y * 100).toFixed(1)}%*\n\n`;
+        if (m.desc.trim()) out += m.desc.trim() + '\n\n';
+      });
+    }
+    download(baseName() + '-marcadores.md', out, 'text/markdown');
+  };
+
+  function renderAll() { renderLayers(); renderMarkers(); renderList(); renderHex(); applyView(); }
+  document.addEventListener('keydown', e => {
+    if (e.target.matches('input,textarea,select')) return;
+    if (e.key === 'Escape') { setAdd(false); select(null); }
+    if (e.key === 'Delete' && selId) $('eDel').click();
+  });
+  syncCfg(); renderAll();
+})();
+</script>
+</body>
+</html>

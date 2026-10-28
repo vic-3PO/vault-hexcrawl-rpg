@@ -1,0 +1,254 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Painel de Sessão</title>
+<link rel="stylesheet" href="tema.css">
+<style>
+  header label input { background: #0004; }
+  #timer { min-width: 5.6rem; text-align: center; padding: .1rem .75rem; font: 700 1.35rem var(--f-num); color: #f3ead3; background: #1a110a; border-radius: 3px; box-shadow: inset 0 2px 5px #000b, 0 1px 0 #fff2; }
+
+  main { display: grid; grid-template-columns: 1.55fr 1fr; gap: 1.8rem; padding: 1.6rem 1.4rem 3rem; max-width: 1450px; margin: 0 auto; align-items: start; }
+  @media (max-width: 900px) { main { grid-template-columns: 1fr; } }
+  section { position: relative; padding: 1.1rem 1.3rem 1.3rem; background-color: var(--papel); background-image: var(--grao); border-radius: 2px;
+    box-shadow: 0 1px 0 var(--papel-2), 0 2px 0 var(--papel), 0 3px 0 var(--papel-2), 0 16px 26px -12px rgb(0 0 0 / .65); }
+  main > div:first-child > section:first-child { background-color: var(--papel-3); }
+  main > div:first-child > section:first-child::before { content: ""; position: absolute; top: -17px; left: 14%; width: 112px; height: 36px; transform: rotate(-2.5deg); background: url("img/web/fita.webp") center / 100% 100% no-repeat; filter: drop-shadow(0 1px 1.5px rgb(0 0 0 / .35)); pointer-events: none; }
+  main > div { display: grid; gap: 1.8rem; }
+  h2 { padding-bottom: .35rem; border-bottom: 2px solid var(--tinta); font-size: 1.2rem; flex-wrap: wrap; } h2::after { display: none; } h2 .sp { flex: 1; }
+  h2 button { font-size: .85rem; }
+  .round { font: 700 .95rem var(--f-titulo); color: var(--perigo); border: 2px double var(--perigo); padding: 0 .55rem; rotate: -3deg; } .round:empty { display: none; }
+  .add { display: flex; gap: .5rem; flex-wrap: wrap; margin-bottom: .9rem; } .add input { min-width: 0; }
+  section .empty { all: unset; display: block; padding: .5rem 0; font: italic 1rem var(--f-titulo); color: var(--tinta-2); }
+
+  /* iniciativa: a coisa mais legível da tela */
+  th { font-size: .85rem; color: var(--tinta-2); font-style: italic; border-bottom-width: 1px; }
+  #ini td { padding: .55rem .4rem; position: relative; }
+  td input[type=number] { width: 4.2rem; text-align: center; font: 700 1.05rem var(--f-num); }
+  td input.nm { width: 100%; min-width: 100px; background: transparent; border-color: transparent; font: 700 1.2rem var(--f-titulo); }
+  td input.nm:focus { background: var(--papel-3); border-color: var(--tinta-2); }
+  tr.turn td { background: var(--tinta); color: var(--papel-3); border-bottom-color: var(--tinta); }
+  tr.turn input { color: inherit; background: transparent; border-bottom-color: rgb(255 255 255 / .5); } tr.turn td input.nm:focus { color: var(--tinta); }
+  tr.turn td:first-child::before { content: ""; position: absolute; left: -17px; top: 50%; margin-top: -13px; border: 13px solid transparent; border-left: 17px solid var(--perigo); border-right: 0; filter: drop-shadow(1px 1px 0 rgb(0 0 0 / .4)); }
+  tr.turn .cond.off { color: var(--papel-3); border-color: rgb(255 255 255 / .45); } tr.turn .bar { border-color: var(--papel-3); }
+  tr.down { opacity: .5; } tr.down td input.nm { text-decoration: line-through; }
+  td:first-child i { width: 15px !important; height: 15px !important; }                               /* o lado, além da cor, pela forma: */
+  td:first-child i[style*="#5b9bd5"] { border-radius: 50% !important; }                              /* jogador: círculo */
+  td:first-child i[style*="#c8553d"] { border-radius: 0 !important; transform: rotate(45deg) scale(.85); } /* inimigo: losango */
+  td:first-child i[style*="#4caf6e"] { border-radius: 0 !important; clip-path: polygon(50% 0, 100% 100%, 0 100%); } /* aliado: triângulo */
+  .hp { display: flex; align-items: center; gap: .25rem; } .hp button { padding: 0 .5rem; min-height: 28px; box-shadow: 1px 2px 0 rgb(var(--sombra) / .8); } .hp small { color: inherit; opacity: .7; font-family: var(--f-num); }
+  .bar { position: relative; height: 11px; margin-top: .35rem; overflow: hidden; background: var(--papel-2); border: 1.5px solid var(--tinta); border-radius: 2px; }
+  .bar i { display: block; height: 100%; transition: width .35s ease, background-color .35s; }
+  .bar::after { content: ""; position: absolute; inset: 0; background: repeating-linear-gradient(90deg, transparent 0 9px, rgb(0 0 0 / .5) 9px 10px); }
+  .conds { display: flex; flex-wrap: wrap; gap: .2rem; }
+  .cond { font: 700 .74rem var(--f-titulo); padding: 0 .5rem; background: var(--perigo); color: #fff; border: 1.5px solid var(--perigo); border-radius: 2px; cursor: pointer; rotate: -1.5deg; }
+  .cond.off { background: transparent; color: var(--tinta-2); border: 1px dashed var(--tinta-2); font-weight: 400; rotate: 0deg; opacity: .6; } .cond.off:hover { opacity: 1; }
+
+  /* cenas */
+  .scene { display: flex; gap: .6rem; align-items: center; padding: .4rem .2rem; border-bottom: 1px solid var(--risco); }
+  .scene input[type=checkbox] { width: 1.25rem; height: 1.25rem; } .scene span { flex: 1; font-family: var(--f-titulo); font-size: 1.02rem; }
+  .scene.done span { text-decoration: line-through; opacity: .5; }
+  .scene.cur { background: color-mix(in srgb, var(--acento) 12%, transparent); box-shadow: inset 5px 0 0 var(--acento); padding-left: .7rem; } .scene.cur span { font-weight: 700; }
+  .scene button { min-height: 28px; font-size: .8rem; padding: .1em .55em; }
+
+  /* dados: cada um com a forma do dado */
+  #dice { display: flex; flex-wrap: wrap; gap: .5rem .6rem; margin-bottom: 1rem; }
+  #dice button { --forma: polygon(50% 2%, 95% 26%, 95% 74%, 50% 98%, 5% 74%, 5% 26%); position: relative; isolation: isolate; width: 54px; height: 54px; padding: 0; display: grid; place-items: center;
+    background: none; border: 0; box-shadow: none; border-radius: 0; font: 700 .88rem var(--f-num); color: var(--tinta); transition: rotate .2s, color .12s; }
+  #dice button::before, #dice button::after { content: ""; position: absolute; inset: 0; clip-path: var(--forma); transition: background .12s; }
+  #dice button::before { background: var(--tinta); z-index: -2; } #dice button::after { background: var(--papel-3); scale: .87; z-index: -1; }
+  #dice button:hover { transform: none; box-shadow: none; rotate: -8deg; color: var(--acento-texto); } #dice button:hover::after { background: var(--acento); }
+  #dice button:active { rotate: 28deg; transform: none; }
+  #dice [data-d="4"] { --forma: polygon(50% 3%, 97% 93%, 3% 93%); padding-top: 9px; }
+  #dice [data-d="6"] { --forma: polygon(7% 7%, 93% 7%, 93% 93%, 7% 93%); }
+  #dice [data-d="8"] { --forma: polygon(50% 1%, 97% 50%, 50% 99%, 3% 50%); }
+  #dice [data-d="10"] { --forma: polygon(50% 0, 100% 38%, 50% 100%, 0 38%); }
+  #dice [data-d="12"] { --forma: polygon(50% 3%, 97% 38%, 79% 95%, 21% 95%, 3% 38%); }
+  #dice [data-d="100"] { --forma: circle(49% at 50% 50%); }
+  #dice [data-d="2d6"], #dice [data-d="3d6"] { --forma: polygon(4% 10%, 96% 10%, 96% 90%, 4% 90%); width: 66px; }
+
+  /* registro e notas: papel pautado */
+  #log { max-height: 300px; overflow: auto; padding: .3rem .9rem; font: .86rem/24px var(--f-mao); background-color: var(--papel-3); border: 1px solid var(--risco);
+    background-image: repeating-linear-gradient(transparent 0 23px, var(--regua) 23px 24px); }
+  #log time { margin-right: .55rem; font: .72rem var(--f-num); color: var(--tinta-2); }
+  #notas { min-height: 11rem; font: .88rem/26px var(--f-mao); background-color: var(--papel-3); background-image: repeating-linear-gradient(transparent 0 25px, var(--regua) 25px 26px); background-attachment: local; }
+</style>
+</head>
+<body>
+<header>
+  <h1><span class="ico i-escudo"></span>Painel de Sessão</h1>
+  <label>Sessão <input id="sNome" placeholder="Sessão 1" style="width:140px"></label>
+  <label>Dia da campanha <input id="sDia" type="number" min="0" style="width:70px"></label>
+  <span id="timer">00:00</span><button id="btnTimer" class="primary">▶ Iniciar</button>
+  <span class="spacer"></span><span id="status"></span>
+  <button id="btnMd" class="primary"><span class="ico i-baixar"></span>Exportar resumo .md</button>
+  <button id="btnNew" class="danger" title="Apaga tudo e começa uma sessão nova">Nova sessão</button>
+</header>
+
+<main>
+  <div style="display:grid;gap:14px">
+    <section>
+      <h2>Iniciativa <span class="round" id="roundLbl"></span><span class="sp"></span>
+        <button id="btnPrev" aria-label="Turno anterior" title="Turno anterior"><span class="ico i-anterior"></span></button><button id="btnNext" class="primary">Próximo turno <span class="ico i-proximo"></span></button><button id="btnSort" title="Ordena por iniciativa; na primeira vez inicia o combate na rodada 1">Ordenar / iniciar</button></h2>
+      <div class="add"><input id="aNome" placeholder="Nome" style="flex:2"><input id="aIni" type="number" placeholder="Inic." style="width:70px"><input id="aPv" type="number" placeholder="PV" style="width:70px">
+        <select id="aLado"><option value="pc">Jogador</option><option value="inimigo">Inimigo</option><option value="aliado">Aliado</option></select><button id="btnAdd" aria-label="Adicionar combatente" title="Adicionar combatente"><span class="ico i-mais"></span></button></div>
+      <div id="ini"></div>
+    </section>
+    <section>
+      <h2>Cenas planejadas</h2>
+      <div class="add"><input id="cNome" placeholder="Ex.: Chegada ao Mosteiro do Sino" style="flex:1"><button id="btnScene" aria-label="Adicionar cena" title="Adicionar cena"><span class="ico i-mais"></span></button></div>
+      <div id="cenas"></div>
+    </section>
+  </div>
+
+  <div style="display:grid;gap:14px">
+    <section>
+      <h2>Dados e registro</h2>
+      <div class="dice" id="dice"></div>
+      <div class="add"><input id="lTxt" placeholder="Anotar no registro e Enter…" style="flex:1"><button id="btnLog">Anotar</button></div>
+      <div id="log"></div>
+    </section>
+    <section>
+      <h2>Notas livres</h2>
+      <textarea id="notas" rows="8" placeholder="Rumores plantados, promessas dos PJs, ideias para a próxima sessão…"></textarea>
+    </section>
+  </div>
+</main>
+
+<script src="autosave.js" data-tool="painel-sessao"></script>
+<script>
+(() => {
+  'use strict';
+  const $ = id => document.getElementById(id);
+  const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
+  const COND = ['caído', 'atordoado', 'envenenado', 'assustado', 'sangrando', 'inconsciente', 'concentrado'];
+  const vazio = () => ({ nome: '', dia: '', ini: [], iniciado: false, turno: 0, rodada: 1, cenas: [], atual: -1, log: [], notas: '', tempo: 0, inicio: null });
+  let S = vazio();
+  try { S = { ...vazio(), ...JSON.parse(localStorage.getItem('painel-sessao')) }; } catch (e) {}
+  const save = () => { try { localStorage.setItem('painel-sessao', JSON.stringify(S)); } catch (e) {} };
+  let stT; const status = t => { $('status').textContent = t; clearTimeout(stT); stT = setTimeout(() => $('status').textContent = '', 2500); };
+  const uid = () => Math.random().toString(36).slice(2, 8);
+  const hhmm = ms => { const s = Math.floor(ms / 1000), h = Math.floor(s / 3600); return (h ? String(h).padStart(2, '0') + ':' : '') + String(Math.floor(s % 3600 / 60)).padStart(2, '0') + ':' + String(s % 60).padStart(2, '0'); };
+
+  /* ---------- cronômetro ---------- */
+  const elapsed = () => S.tempo + (S.inicio ? Date.now() - S.inicio : 0);
+  function tickTimer() { $('timer').textContent = hhmm(elapsed()); $('btnTimer').textContent = S.inicio ? '❚❚ Pausar' : (S.tempo ? '▶ Retomar' : '▶ Iniciar'); }
+  $('btnTimer').onclick = () => { if (S.inicio) { S.tempo += Date.now() - S.inicio; S.inicio = null; } else S.inicio = Date.now(); save(); tickTimer(); };
+  setInterval(tickTimer, 1000);
+
+  /* ---------- registro e dados ---------- */
+  function anota(txt) { S.log.push({ t: elapsed(), txt }); save(); renderLog(); }
+  function renderLog() {
+    $('log').innerHTML = S.log.length ? S.log.slice().reverse().map(l => `<div><time>${hhmm(l.t)}</time>${esc(l.txt)}</div>`).join('') : '<div class="empty">Nada registrado ainda.</div>';
+  }
+  $('dice').innerHTML = [4, 6, 8, 10, 12, 20, 100].map(n => `<button data-d="${n}">d${n}</button>`).join('') + '<button data-d="2d6">2d6</button><button data-d="3d6">3d6</button>';
+  $('dice').onclick = e => {
+    const d = e.target.dataset.d; if (!d) return;
+    const [q, f] = /d/.test(d) && !d.startsWith('d') ? d.split('d').map(Number) : [1, Number(d)];
+    const rolls = Array.from({ length: q }, () => 1 + Math.floor(Math.random() * f)), total = rolls.reduce((a, b) => a + b, 0);
+    anota(`Rolagem ${q > 1 ? q : ''}d${f}: ${q > 1 ? rolls.join(' + ') + ' = ' : ''}${total}`); status(`${q > 1 ? q : ''}d${f} → ${total}`);
+  };
+  $('btnLog').onclick = () => { const v = $('lTxt').value.trim(); if (v) { anota(v); $('lTxt').value = ''; } };
+  $('lTxt').onkeydown = e => { if (e.key === 'Enter') $('btnLog').click(); };
+
+  /* ---------- iniciativa ---------- */
+  const LADO = { pc: '#5b9bd5', inimigo: '#c8553d', aliado: '#4caf6e' };
+  function renderIni() {
+    $('roundLbl').textContent = S.ini.length ? `Rodada ${S.rodada}` : '';
+    if (!S.ini.length) { $('ini').innerHTML = '<div class="empty">Adicione os participantes do combate.</div>'; return; }
+    $('ini').innerHTML = `<table><tr><th></th><th>Nome</th><th>Inic.</th><th>PV</th><th>Condições</th><th></th></tr>` + S.ini.map((c, i) => {
+      const pct = c.max ? Math.max(0, Math.min(100, c.pv / c.max * 100)) : 0;
+      return `<tr data-i="${i}" class="${i === S.turno ? 'turn' : ''} ${c.max && c.pv <= 0 ? 'down' : ''}">
+        <td style="width:12px"><i style="display:block;width:8px;height:8px;border-radius:50%;background:${LADO[c.lado]}"></i></td>
+        <td><input class="nm" data-f="nome" value="${esc(c.nome)}"></td>
+        <td><input type="number" data-f="ini" value="${c.ini}"></td>
+        <td><div class="hp"><button data-a="dano">−</button><input type="number" data-f="pv" value="${c.pv ?? ''}" ${c.max ? '' : 'placeholder="—"'}><button data-a="cura">＋</button>${c.max ? `<small style="color:var(--muted)">/${c.max}</small>` : ''}</div>
+          ${c.max ? `<div class="bar"><i style="width:${pct}%;background:${pct > 50 ? 'var(--ok)' : pct > 25 ? 'var(--warn)' : 'var(--bad)'}"></i></div>` : ''}</td>
+        <td><div class="conds">${COND.map(k => `<span class="cond ${c.cond.includes(k) ? '' : 'off'}" data-c="${k}">${k}</span>`).join('')}</div></td>
+        <td><button data-a="del" class="danger" title="Remover">✕</button></td></tr>`;
+    }).join('') + '</table>';
+  }
+  $('btnAdd').onclick = () => {
+    const nome = $('aNome').value.trim(); if (!nome) return;
+    const pv = $('aPv').value === '' ? null : Number($('aPv').value);
+    S.ini.push({ id: uid(), nome, ini: Number($('aIni').value) || 0, pv, max: pv, lado: $('aLado').value, cond: [] });
+    if (S.iniciado) ordena();                           // retardatário entra na ordem sem mexer no turno atual
+    $('aNome').value = $('aIni').value = $('aPv').value = ''; $('aNome').focus(); save(); renderIni();
+  };
+  $('aNome').onkeydown = e => { if (e.key === 'Enter') $('btnAdd').click(); };
+  const ordena = () => { const atual = S.ini[S.turno]; S.ini.sort((a, b) => b.ini - a.ini); S.turno = Math.max(0, S.ini.indexOf(atual)); };
+  $('btnSort').onclick = () => {
+    ordena();
+    if (!S.iniciado) { S.iniciado = true; S.turno = 0; S.rodada = 1; if (S.ini.length) anota(`Combate iniciado — ${S.ini[0].nome} abre a rodada 1`); }
+    save(); renderIni();
+  };
+  function passa(d) {
+    if (!S.ini.length) return;
+    let t = S.turno, r = S.rodada;
+    for (let n = 0; n < S.ini.length; n++) {            // pula quem está a 0 PV
+      t += d; if (t >= S.ini.length) { t = 0; r++; } if (t < 0) { t = S.ini.length - 1; r = Math.max(1, r - 1); }
+      const c = S.ini[t]; if (!(c.max && c.pv <= 0)) break;
+    }
+    S.turno = t; S.rodada = r; save(); renderIni();
+    if (d > 0) anota(`Turno de ${S.ini[t].nome} (rodada ${r})`);
+  }
+  $('btnNext').onclick = () => passa(1); $('btnPrev').onclick = () => passa(-1);
+  $('ini').addEventListener('click', e => {
+    const tr = e.target.closest('tr[data-i]'); if (!tr) return; const c = S.ini[+tr.dataset.i];
+    const a = e.target.closest('[data-a]')?.dataset.a, k = e.target.dataset.c;
+    if (a === 'del') { if (!confirm(`Remover ${c.nome}?`)) return; S.ini.splice(+tr.dataset.i, 1); S.turno = Math.min(S.turno, Math.max(0, S.ini.length - 1)); }
+    else if (a === 'dano' || a === 'cura') {
+      const v = Number(prompt(a === 'dano' ? 'Dano:' : 'Cura:', '1')); if (!v) return; if (c.pv == null) c.pv = c.max = 0;
+      c.pv = a === 'dano' ? c.pv - v : Math.min(c.max ?? Infinity, c.pv + v); anota(`${c.nome}: ${a === 'dano' ? '−' : '+'}${v} PV (${c.pv}${c.max ? '/' + c.max : ''})`);
+    } else if (k) { c.cond = c.cond.includes(k) ? c.cond.filter(x => x !== k) : [...c.cond, k]; if (c.cond.includes(k)) anota(`${c.nome}: ${k}`); }
+    else return;
+    save(); renderIni();
+  });
+  $('ini').addEventListener('change', e => {
+    const tr = e.target.closest('tr[data-i]'), f = e.target.dataset.f; if (!tr || !f) return; const c = S.ini[+tr.dataset.i];
+    c[f] = f === 'nome' ? e.target.value : (e.target.value === '' ? null : Number(e.target.value)); if (f === 'pv' && c.max == null) c.max = c.pv; save(); renderIni();
+  });
+
+  /* ---------- cenas ---------- */
+  function renderCenas() {
+    $('cenas').innerHTML = S.cenas.length ? S.cenas.map((c, i) => `<div class="scene ${c.feita ? 'done' : ''} ${i === S.atual ? 'cur' : ''}" data-i="${i}">
+      <input type="checkbox" data-a="chk" ${c.feita ? 'checked' : ''}><span>${esc(c.nome)}</span>
+      <button data-a="now" title="Cena em andamento">${i === S.atual ? '● agora' : '▶'}</button><button data-a="up">↑</button><button data-a="del" class="danger">✕</button></div>`).join('')
+      : '<div class="empty">Liste as cenas que você planejou.</div>';
+  }
+  $('btnScene').onclick = () => { const v = $('cNome').value.trim(); if (!v) return; S.cenas.push({ nome: v, feita: false }); $('cNome').value = ''; save(); renderCenas(); };
+  $('cNome').onkeydown = e => { if (e.key === 'Enter') $('btnScene').click(); };
+  $('cenas').onclick = e => {
+    const row = e.target.closest('.scene'); const a = e.target.dataset.a; if (!row || !a) return; const i = +row.dataset.i, c = S.cenas[i];
+    if (a === 'chk') { c.feita = e.target.checked; if (c.feita) anota(`Cena concluída: ${c.nome}`); }
+    else if (a === 'now') { S.atual = S.atual === i ? -1 : i; if (S.atual === i) anota(`Cena iniciada: ${c.nome}`); }
+    else if (a === 'up' && i > 0) { [S.cenas[i - 1], S.cenas[i]] = [S.cenas[i], S.cenas[i - 1]]; if (S.atual === i) S.atual = i - 1; else if (S.atual === i - 1) S.atual = i; }
+    else if (a === 'del') { S.cenas.splice(i, 1); if (S.atual === i) S.atual = -1; else if (S.atual > i) S.atual--; }
+    save(); renderCenas();
+  };
+
+  /* ---------- campos simples ---------- */
+  [['sNome', 'nome'], ['sDia', 'dia'], ['notas', 'notas']].forEach(([id, k]) => { $(id).value = S[k] ?? ''; $(id).oninput = () => { S[k] = $(id).value; save(); }; });
+
+  /* ---------- exportar / reiniciar ---------- */
+  $('btnMd').onclick = () => {
+    const nome = S.nome.trim() || 'Sessão', data = new Date().toISOString().slice(0, 10);
+    let md = `---\ntipo: sessão\ndata: ${data}\n${S.dia !== '' ? `dia: ${S.dia}\n` : ''}duração: ${hhmm(elapsed())}\n---\n\n# ${nome}\n\n`;
+    if (S.cenas.length) md += `## Cenas\n\n${S.cenas.map(c => `- [${c.feita ? 'x' : ' '}] ${c.nome}`).join('\n')}\n\n`;
+    if (S.ini.length) md += `## Combate (${S.rodada} ${S.rodada === 1 ? 'rodada' : 'rodadas'})\n\n| Nome | Lado | PV | Condições |\n| --- | --- | --- | --- |\n` +
+      S.ini.map(c => `| ${c.nome} | ${c.lado} | ${c.pv ?? '—'}${c.max ? '/' + c.max : ''} | ${c.cond.join(', ') || '—'} |`).join('\n') + '\n\n';
+    if (S.log.length) md += `## Registro\n\n${S.log.map(l => `- \`${hhmm(l.t)}\` ${l.txt}`).join('\n')}\n\n`;
+    if (S.notas.trim()) md += `## Notas\n\n${S.notas.trim()}\n`;
+    const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([md], { type: 'text/markdown' })); a.download = `${nome}.md`; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+    status('Resumo exportado — salve na pasta de eventos/sessões do vault');
+  };
+  $('btnNew').onclick = () => {
+    if (!confirm('Apagar a sessão atual (iniciativa, cenas, registro e notas)? Exporte o resumo antes se quiser guardá-la.')) return;
+    S = vazio(); save(); ['sNome', 'sDia', 'notas'].forEach(id => $(id).value = ''); renderIni(); renderCenas(); renderLog(); tickTimer();
+  };
+  renderIni(); renderCenas(); renderLog(); tickTimer();
+})();
+</script>
+</body>
+</html>

@@ -43,6 +43,7 @@ Depois, o [Guia de Utilização](DOCUMENTAÇÃO/01%20-%20Guia%20de%20Utiliza%C3%
   Templates/                  templates do Templater (um por tipo de nota)
 01 - Exemplo/               campanha completa "A Pedra da Bruma"
 DOCUMENTAÇÃO/               guia, tutorial do Obsidian, princípios, filosofia, fluxo de criação
+Ferramentas/                mapa interativo, relógios, teia de relações, linha do tempo e painel de sessão (HTML)
 scripts/                    verificação de links (Python)
 ```
 
@@ -58,6 +59,10 @@ scripts/                    verificação de links (Python)
 8. **Recompensas.** Aliados e segredos valem tanto quanto itens.
 
 O passo a passo está em [Fluxo de Criação de uma Campanha](DOCUMENTAÇÃO/05%20-%20Fluxo%20de%20Cria%C3%A7%C3%A3o%20de%20uma%20Campanha.md).
+
+## Ferramentas
+
+Em [`Ferramentas/`](Ferramentas/README.md) há cinco ferramentas em HTML que abrem direto no navegador, sem instalar nada: um **mapa com marcadores móveis**, um **painel de relógios** que lê e atualiza as notas, uma **teia de relações**, uma **linha do tempo** da campanha e um **painel de sessão** com iniciativa, dados e resumo. Abra `Ferramentas/index.html`. O guia completo está em [`Ferramentas/README.md`](Ferramentas/README.md).
 
 ## Verificação de links
 
@@ -79,7 +84,7 @@ python scripts/check_links.py
 O repositório usa duas licenças, detalhadas no arquivo [LICENSE](LICENSE):
 
 - **Conteúdo** (notas, documentação, templates, imagens e a campanha de exemplo): [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/deed.pt_BR). Você pode usar, adaptar e redistribuir, inclusive em mesas e materiais próprios, desde que dê crédito e compartilhe as adaptações sob a mesma licença.
-- **Script** em `scripts/`: licença [MIT](https://opensource.org/license/mit), um programa open source.
+- **Código** em `scripts/` e `Ferramentas/` (o script e as ferramentas em HTML, CSS e JavaScript): licença [MIT](https://opensource.org/license/mit), open source. As texturas opcionais de `Ferramentas/img/` não vêm no repositório e têm as licenças dos seus autores.
 
 ## Contribuindo
 

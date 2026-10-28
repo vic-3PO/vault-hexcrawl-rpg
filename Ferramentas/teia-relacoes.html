@@ -1,0 +1,376 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Teia de Relações</title>
+<link rel="stylesheet" href="tema.css">
+<style>
+  html, body { height: 100%; } body { display: flex; flex-direction: column; overflow: hidden; }
+  main { flex: 1; display: flex; min-height: 0; }
+
+  /* quadro de cortiça */
+  #view { flex: 1; position: relative; overflow: hidden; cursor: grab; touch-action: none; background-color: var(--cortica);
+    background-image: linear-gradient(var(--veu-cortica), var(--veu-cortica)), var(--cortica-img), radial-gradient(ellipse at 50% 45%, transparent 45%, rgb(0 0 0 / .4)); background-size: auto, 650px, 260px, auto;
+    box-shadow: inset 0 0 0 10px #4a3320, inset 0 0 0 11px rgb(0 0 0 / .5), inset 0 0 28px 12px rgb(0 0 0 / .45); }
+  #view.panning { cursor: grabbing; }
+  svg#svg { width: 100%; height: 100%; display: block; }
+  #empty { position: absolute; inset: 0; display: grid; place-items: center; padding: 24px; pointer-events: none; }
+  #empty .vazio { max-width: 30rem; }
+
+  /* nós: tachinha + ficha de papel com o nome */
+  .node circle { stroke: #1a1208; stroke-width: 2; cursor: pointer; filter: url(#tachinha); }
+  .node.sel circle { stroke: var(--papel-3); stroke-width: 4; }
+  .node.pin circle { stroke-dasharray: 3 2; }
+  .node text { font: 600 12px var(--f-mao); fill: var(--tinta); stroke: none; text-anchor: middle; pointer-events: none; filter: url(#etiqueta); }
+  .node.dim, .edge.dim { opacity: .14; }
+
+  /* fios: cada tipo de relação tem cor e traçado próprios */
+  .edge line:first-child { stroke-linecap: round; filter: drop-shadow(1px 2px 1px rgb(0 0 0 / .4)); }
+  .edge line[stroke="#4caf6e"] { stroke: #2f7d3b; stroke-dasharray: none; }                    /* aliado: fio contínuo */
+  .edge line[stroke="#c8553d"] { stroke: #b3261a; stroke-dasharray: 10 5; }                    /* inimigo: tracejado */
+  .edge line[stroke="#9b6bd1"] { stroke: #7a4fb0; stroke-dasharray: 14 4 2 4; }                /* serve a: traço e ponto */
+  .edge line[stroke="#d9a441"] { stroke: #e3b02c; stroke-dasharray: .5 7; stroke-width: 4; }   /* deve favor: moedas */
+  .edge line[stroke="#e08fb0"] { stroke: #d6568c; stroke-width: 5; }                            /* família: fio grosso */
+  .edge line[stroke="#e0813a"] { stroke: #d9661a; stroke-dasharray: 3 4; }                     /* rival */
+  .edge line[stroke="#8d8d8d"] { stroke: #4a4a4a; stroke-dasharray: .5 5; }                    /* outro */
+  .edge line[stroke="#6b5f50"] { stroke: #3b2a1a; stroke-opacity: .55; stroke-dasharray: 2 4; } /* vindas das notas: lápis */
+  .edge.sel line:first-child { stroke-width: 6px; }
+  /* ligações vindas das notas (local, região, menciona…): o nome do campo só aparece ao passar o mouse */
+  .edge:has(line[stroke="#6b5f50"]) text { display: none; } .edge:has(line[stroke="#6b5f50"]):hover text { display: block; }
+  .edge text { font: 12px var(--f-mao); fill: var(--tinta); stroke: var(--papel-3); stroke-width: 4px; paint-order: stroke; text-anchor: middle; pointer-events: none; }
+
+  /* painel lateral: folha de anotações */
+  aside { width: 320px; overflow: auto; position: relative; z-index: 2; background-color: var(--papel);
+    background-image: linear-gradient(90deg, transparent 33px, rgb(168 48 31 / .4) 33px 34px, transparent 34px), repeating-linear-gradient(transparent 0 27px, var(--regua) 27px 28px), var(--grao);
+    box-shadow: -12px 0 26px -10px rgb(0 0 0 / .65), -1px 0 0 var(--risco); }
+  aside section { padding: .9rem 1rem .9rem 2.9rem; border-bottom: 1px dashed var(--risco); }
+  .chips { display: flex; flex-wrap: wrap; gap: .1rem .8rem; }
+  .chips label { display: inline-flex; align-items: center; gap: .35rem; margin: 0; font: .88rem var(--f-corpo); font-style: normal; color: var(--tinta); cursor: pointer; }
+  .dot { display: inline-block; flex: none; width: 11px; height: 11px; border-radius: 50%; box-shadow: inset 0 0 0 2px rgb(0 0 0 / .28); }
+  #search { margin-top: .6rem; width: 100%; } aside input#vault { width: 100%; }
+  .kv { display: grid; grid-template-columns: auto 1fr; gap: 2px .8rem; font-size: .88rem; } .kv b { font: italic 500 .88rem var(--f-titulo); color: var(--tinta-2); }
+  .conn { display: flex; gap: .5rem; align-items: center; padding: .15rem 0; cursor: pointer; font-family: var(--f-titulo); } .conn:hover { color: var(--acento); text-decoration: underline wavy; }
+  .conn small { color: var(--tinta-2); font-family: var(--f-mao); }
+  @media (max-width: 760px) { main { flex-direction: column; } aside { width: 100%; max-height: 42%; } }
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>
+  <filter id="tachinha" x="-40%" y="-40%" width="180%" height="190%">
+    <feGaussianBlur in="SourceAlpha" stdDeviation="2" result="b"/>
+    <feSpecularLighting in="b" surfaceScale="4" specularConstant=".75" specularExponent="48" lighting-color="#fff" result="s"><fePointLight x="-30" y="-50" z="80"/></feSpecularLighting>
+    <feComposite in="s" in2="SourceAlpha" operator="in" result="s2"/>
+    <feComposite in="SourceGraphic" in2="s2" operator="arithmetic" k1="0" k2="1" k3="1" k4="0" result="lit"/>
+    <feDropShadow in="lit" dx="2" dy="4" stdDeviation="1.8" flood-color="#000" flood-opacity=".5"/>
+  </filter>
+  <filter id="etiqueta" x="-7%" y="-14%" width="114%" height="128%">
+    <feFlood style="flood-color: var(--papel-3)" result="f"/>
+    <feMerge result="m"><feMergeNode in="f"/><feMergeNode in="SourceGraphic"/></feMerge>
+    <feDropShadow in="m" dx="1" dy="2" stdDeviation="1" flood-color="#000" flood-opacity=".45"/>
+  </filter>
+</defs></svg>
+<header>
+  <h1><span class="ico i-teia"></span>Teia de Relações</h1>
+  <button id="btnDir" class="primary"><span class="ico i-pasta"></span>Abrir pasta do vault…</button>
+  <input id="fileDir" type="file" webkitdirectory multiple hidden>
+  <button id="btnNode"><span class="ico i-mais"></span>Nó</button>
+  <button id="btnRel"><span class="ico i-mais"></span>Relação</button>
+  <button id="btnBody" title="Incluir [[links]] encontrados no texto das notas">Links do texto</button>
+  <button id="btnLbl" class="on" title="Rótulos das relações">Rótulos</button>
+  <button id="btnRun" title="Reorganizar automaticamente">Reorganizar</button>
+  <span class="spacer"></span><span id="status"></span>
+  <button id="btnImp">Importar</button><input id="fileJson" type="file" accept=".json" hidden>
+  <button id="btnExp">Exportar</button>
+</header>
+<main>
+  <div id="view">
+    <svg id="svg"><g id="cam"><g id="edges"></g><g id="nodes"></g></g></svg>
+    <div id="empty"><div class="vazio"><p>Abra a pasta do vault ou crie nós</p>
+      <p>NPCs, facções, locais e missões viram nós; os campos <code>local</code>, <code>facção</code>, <code>região</code>, <code>recompensa</code>… viram ligações.<br>
+      Crie relações próprias (aliado, inimigo, deve favor…) com <b>＋ Relação</b>.</p></div></div>
+  </div>
+  <aside>
+    <section><h2>Filtros</h2><div class="chips" id="types"></div><input id="search" type="search" placeholder="Buscar…" style="margin-top:10px"></section>
+    <section id="info"><h2>Seleção</h2><div style="color:var(--muted)">Clique num nó ou numa relação.<br>Arraste para mover (o nó fica fixo; duplo clique solta).</div></section>
+    <section><h2>Vault</h2><label>Nome do vault no Obsidian (para abrir notas)</label><input id="vault" placeholder="base-campanha"></section>
+  </aside>
+</main>
+
+<dialog id="dlgNode"><form method="dialog" id="fNode"><h3 style="margin-top:0">Novo nó</h3>
+  <label>Nome</label><input id="nnNome" required><label>Tipo</label><input id="nnTipo" list="tiposList" value="npc">
+  <datalist id="tiposList"></datalist>
+  <div class="row" style="margin-top:14px"><button class="primary" value="ok">Criar</button><button value="x" formnovalidate>Cancelar</button></div></form></dialog>
+<dialog id="dlgRel"><form method="dialog" id="fRel"><h3 style="margin-top:0">Nova relação</h3>
+  <label>De</label><select id="rA"></select>
+  <label>Tipo</label><select id="rTipo"></select>
+  <label>Para</label><select id="rB"></select>
+  <label>Rótulo (opcional)</label><input id="rLabel" placeholder="ex.: lhe deve a vida">
+  <div class="row" style="margin-top:14px"><button class="primary" value="ok">Criar</button><button value="x" formnovalidate>Cancelar</button></div></form></dialog>
+
+<script src="autosave.js" data-tool="teia-relacoes"></script>
+<script>
+(() => {
+  'use strict';
+  const $ = id => document.getElementById(id);
+  const NS = 'http://www.w3.org/2000/svg';
+  const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
+  const IGNORE = /^(\.|node_modules$|graphify-out$|Ferramentas$)/;
+  const REL = { aliado:['Aliado','#4caf6e'], inimigo:['Inimigo','#c8553d'], serve:['Serve a','#9b6bd1'], deve:['Deve favor a','#d9a441'],
+                familia:['Família','#e08fb0'], rival:['Rival','#e0813a'], outro:['Outro','#8d8d8d'] };
+  const TIPO_COR = { npc:'#e08fb0', 'facção':'#9b6bd1', local:'#d9a441', assentamento:'#5b9bd5', 'região':'#3f8f8f', 'missão':'#4caf6e',
+                     'relógio':'#c8553d', evento:'#e0813a', vilão:'#a63a3a', monstro:'#7a7a3a', item:'#b8b8d0' };
+  const FALLBACK = ['#8d8d8d', '#6fa8a0', '#a08fd0', '#d0a08f'];
+  const corTipo = t => TIPO_COR[t] || FALLBACK[[...t].reduce((s, c) => s + c.charCodeAt(0), 0) % FALLBACK.length];
+  const tipoNorm = t => String(t ?? '').startsWith('missão') ? 'missão' : String(t ?? '');
+
+  let nodes = new Map(), edges = [];        // derivados do vault + manuais
+  let manual = { nos: [], rel: [], pos: {}, vault: '' };
+  let notas = [], bodyLinks = false, showLbl = true, hiddenTypes = new Set(), sel = null; // sel: {k:'n'|'e', id}
+  let cam = { x: 0, y: 0, k: 1 }, alpha = 0, raf = 0;
+
+  /* ---------- persistência ---------- */
+  try { Object.assign(manual, JSON.parse(localStorage.getItem('teia:manual') || '{}')); } catch (e) {}
+  const save = () => { try { localStorage.setItem('teia:manual', JSON.stringify(manual)); } catch (e) {} };
+  let stT; const status = t => { $('status').textContent = t; clearTimeout(stT); stT = setTimeout(() => $('status').textContent = '', 3000); };
+
+  /* ---------- leitura do vault ---------- */
+  function parseFm(text) {
+    const m = text.match(/^---\r?\n([\s\S]*?)\r?\n---/); const fm = {}; if (!m) return { fm, body: text };
+    for (const l of m[1].split(/\r?\n/)) { const k = l.match(/^([^:#\s][^:]*):\s*(.*)$/); if (k) fm[k[1].trim()] = k[2].trim().replace(/^["']|["']$/g, ''); }
+    return { fm, body: text.slice(m[0].length) };
+  }
+  const links = s => [...String(s).matchAll(/\[\[([^\]|#]+)(?:[#|][^\]]*)?\]\]/g)].map(m => m[1].trim());
+  async function walk(dir, out) {
+    for await (const [nome, h] of dir.entries()) {
+      if (IGNORE.test(nome)) continue;
+      if (h.kind === 'directory') await walk(h, out); else if (nome.endsWith('.md')) out.push({ nome: nome.replace(/\.md$/, ''), get: async () => (await h.getFile()).text() });
+    }
+  }
+  async function ingest(lista) {
+    notas = [];
+    for (const it of lista) { const { fm, body } = parseFm(await it.get()); if (fm.tipo && !['painel', 'mapa'].includes(fm.tipo)) notas.push({ nome: it.nome, fm, body }); }
+    status(`${notas.length} notas tipadas lidas`); rebuild(true);
+  }
+  $('btnDir').onclick = async () => {
+    if (window.showDirectoryPicker) {
+      try { const d = await window.showDirectoryPicker(); const l = []; await walk(d, l); await ingest(l); }
+      catch (e) { if (e.name !== 'AbortError') status('Erro: ' + e.message); }
+    } else $('fileDir').click();
+  };
+  $('fileDir').onchange = async e => {
+    const l = [...e.target.files].filter(f => f.name.endsWith('.md') && !f.webkitRelativePath.split('/').some(p => IGNORE.test(p)))
+      .map(f => ({ nome: f.name.replace(/\.md$/, ''), get: () => f.text() }));
+    await ingest(l);
+  };
+
+  /* ---------- grafo ---------- */
+  function rebuild(reheat) {
+    const old = nodes; nodes = new Map(); edges = [];
+    const add = (id, tipo, extra = {}) => {
+      const p = manual.pos[id], o = old.get(id);
+      nodes.set(id, { id, tipo, x: p ? p[0] : o ? o.x : (Math.random() - .5) * 400, y: p ? p[1] : o ? o.y : (Math.random() - .5) * 300,
+                      vx: 0, vy: 0, fixed: !!p, ...extra });
+    };
+    for (const n of notas) add(n.nome, tipoNorm(n.fm.tipo), { fm: n.fm });
+    for (const n of manual.nos) if (!nodes.has(n.nome)) add(n.nome, n.tipo, { manual: true });
+    const seen = new Set();
+    const link = (a, b, rel, extra = {}) => {
+      if (a === b || !nodes.has(a) || !nodes.has(b)) return;
+      const key = [a, b].sort().join('|') + rel; if (seen.has(key) && !extra.manual) return; seen.add(key);
+      edges.push({ a, b, rel, ...extra });
+    };
+    for (const n of notas) {
+      for (const [campo, v] of Object.entries(n.fm)) {
+        if (campo === 'tipo') continue;
+        const alvos = links(v); if (!alvos.length && nodes.has(v)) alvos.push(v);
+        alvos.forEach(t => link(n.nome, t, campo));
+      }
+      if (bodyLinks) links(n.body).forEach(t => link(n.nome, t, 'menciona'));
+    }
+    manual.rel.forEach((r, i) => link(r.a, r.b, r.tipo, { manual: true, label: r.label, idx: i }));
+    if (sel && ((sel.k === 'n' && !nodes.has(sel.id)))) sel = null;
+    renderTypes(); render(); $('empty').style.display = nodes.size ? 'none' : ''; if (reheat) { heat(1); fit(); }
+  }
+
+  /* ---------- render ---------- */
+  const el = (tag, attrs = {}, parent) => { const e = document.createElementNS(NS, tag); for (const k in attrs) e.setAttribute(k, attrs[k]); parent && parent.appendChild(e); return e; };
+  const vis = n => !hiddenTypes.has(n.tipo);
+  const grau = id => edges.reduce((s, e) => s + (e.a === id || e.b === id), 0);
+  function render() {
+    $('edges').innerHTML = ''; $('nodes').innerHTML = '';
+    const q = $('search').value.trim().toLowerCase();
+    edges.forEach((e, i) => {
+      e.line = null;
+      const a = nodes.get(e.a), b = nodes.get(e.b); if (!vis(a) || !vis(b)) return;
+      const cor = REL[e.rel]?.[1] || '#6b5f50', forte = !!REL[e.rel];
+      const g = el('g', { class: 'edge' + (sel?.k === 'e' && sel.id === i ? ' sel' : '') }, $('edges'));
+      e.line = el('line', { stroke: cor, 'stroke-width': forte ? 2.5 : 1.2, 'stroke-opacity': forte ? .95 : .55, 'stroke-dasharray': forte ? '' : '4 3' }, g);
+      el('line', { stroke: 'transparent', 'stroke-width': 12, 'data-e': i }, g).style.cursor = 'pointer';
+      e.txt = el('text', {}, g); e.txt.textContent = showLbl ? (e.label || (forte ? REL[e.rel][0] : e.rel)) : ''; e.g = g;
+      if (q) g.classList.add('dim');
+    });
+    for (const n of nodes.values()) {
+      if (!vis(n)) { n.g = null; continue; }
+      const g = el('g', { class: 'node' + (sel?.k === 'n' && sel.id === n.id ? ' sel' : '') + (n.fixed ? ' pin' : ''), 'data-n': n.id }, $('nodes'));
+      el('circle', { r: 8 + Math.min(14, grau(n.id) * 1.5), fill: corTipo(n.tipo) }, g);
+      el('text', { y: -(12 + Math.min(14, grau(n.id) * 1.5)) }, g).textContent = n.id;
+      if (q && !n.id.toLowerCase().includes(q)) g.classList.add('dim');
+      n.g = g;
+    }
+    place(); renderInfo();
+  }
+  function place() {
+    for (const n of nodes.values()) n.g && n.g.setAttribute('transform', `translate(${n.x.toFixed(1)},${n.y.toFixed(1)})`);
+    for (const e of edges) {
+      const a = nodes.get(e.a), b = nodes.get(e.b); if (!e.line) continue;
+      e.line.setAttribute('x1', a.x); e.line.setAttribute('y1', a.y); e.line.setAttribute('x2', b.x); e.line.setAttribute('y2', b.y);
+      const hit = e.g.children[1]; hit.setAttribute('x1', a.x); hit.setAttribute('y1', a.y); hit.setAttribute('x2', b.x); hit.setAttribute('y2', b.y);
+      e.txt.setAttribute('x', (a.x + b.x) / 2); e.txt.setAttribute('y', (a.y + b.y) / 2 - 3);
+    }
+  }
+  function renderTypes() {
+    const ts = [...new Set([...nodes.values()].map(n => n.tipo))].sort();
+    $('types').innerHTML = ts.map(t => `<label><input type="checkbox" data-t="${esc(t)}" ${hiddenTypes.has(t) ? '' : 'checked'}><span class="dot" style="background:${corTipo(t)}"></span>${esc(t)}</label>`).join('');
+    $('tiposList').innerHTML = ts.map(t => `<option value="${esc(t)}">`).join('');
+  }
+  $('types').onchange = e => { const t = e.target.dataset.t; if (!t) return; e.target.checked ? hiddenTypes.delete(t) : hiddenTypes.add(t); render(); heat(.4); };
+  $('search').oninput = render;
+
+  function renderInfo() {
+    const box = $('info');
+    if (!sel) { box.innerHTML = '<h2>Seleção</h2><div style="color:var(--muted)">Clique num nó ou numa relação.<br>Arraste para mover (o nó fica fixo; duplo clique solta).</div>'; return; }
+    if (sel.k === 'e') {
+      const e = edges[sel.id]; if (!e) { sel = null; return renderInfo(); }
+      box.innerHTML = `<h2>Relação</h2><div><b>${esc(e.a)}</b> → <b>${esc(e.b)}</b></div><div style="color:var(--muted)">${esc(REL[e.rel]?.[0] || e.rel)}${e.label ? ' — ' + esc(e.label) : ''}</div>` +
+        (e.manual ? '<button class="danger" id="delE" style="margin-top:10px">Excluir relação</button>' : '<div style="color:var(--muted);margin-top:8px;font-size:12px">Vem do vault; edite a nota para mudar.</div>');
+      if (e.manual) $('delE').onclick = () => { manual.rel.splice(e.idx, 1); sel = null; save(); rebuild(); };
+      return;
+    }
+    const n = nodes.get(sel.id);
+    const campos = Object.entries(n.fm || {}).filter(([k]) => k !== 'tipo').map(([k, v]) => `<b>${esc(k)}</b><span>${esc(String(v).replace(/\[\[|\]\]/g, ''))}</span>`).join('');
+    const ligs = edges.filter(e => e.a === n.id || e.b === n.id).map(e => {
+      const o = e.a === n.id ? e.b : e.a, dir = e.a === n.id ? '→' : '←';
+      return `<div class="conn" data-go="${esc(o)}"><span class="dot" style="background:${corTipo(nodes.get(o).tipo)}"></span>${dir} ${esc(o)} <small>${esc(e.label || REL[e.rel]?.[0] || e.rel)}</small></div>`;
+    }).join('');
+    box.innerHTML = `<h2>${esc(n.id)}</h2><div style="margin-bottom:8px"><span class="dot" style="background:${corTipo(n.tipo)}"></span> ${esc(n.tipo)}${n.fixed ? ' · fixo' : ''}</div>
+      ${campos ? `<div class="kv">${campos}</div>` : ''}<h2 style="margin-top:12px">Ligações (${edges.filter(e => e.a === n.id || e.b === n.id).length})</h2>${ligs || '<div style="color:var(--muted)">Nenhuma.</div>'}
+      <div class="row" style="margin-top:12px">${manual.vault ? '<button id="bOpen">Abrir no Obsidian</button>' : ''}<button id="bRel"><span class="ico i-mais"></span>Relação</button>${n.manual ? '<button id="bDel" class="danger">Excluir nó</button>' : ''}</div>`;
+    box.querySelectorAll('[data-go]').forEach(c => c.onclick = () => select({ k: 'n', id: c.dataset.go }));
+    $('bRel').onclick = () => openRel(n.id);
+    if ($('bOpen')) $('bOpen').onclick = () => location.href = `obsidian://open?vault=${encodeURIComponent(manual.vault)}&file=${encodeURIComponent(n.id)}`;
+    if ($('bDel')) $('bDel').onclick = () => {
+      manual.nos = manual.nos.filter(x => x.nome !== n.id); manual.rel = manual.rel.filter(r => r.a !== n.id && r.b !== n.id); delete manual.pos[n.id]; sel = null; save(); rebuild();
+    };
+  }
+  function select(s) { sel = s; render(); }
+
+  /* ---------- física ---------- */
+  function heat(a) { alpha = Math.max(alpha, a); if (!raf) raf = requestAnimationFrame(loop); }
+  function loop() {
+    raf = 0; const N = [...nodes.values()].filter(vis); if (!N.length) return;
+    for (let i = 0; i < N.length; i++) for (let j = i + 1; j < N.length; j++) {
+      const a = N[i], b = N[j]; let dx = a.x - b.x, dy = a.y - b.y, d2 = dx * dx + dy * dy + 1; const d = Math.sqrt(d2), f = Math.min(40, 5200 / d2);
+      dx = dx / d * f; dy = dy / d * f; a.vx += dx; a.vy += dy; b.vx -= dx; b.vy -= dy;
+    }
+    for (const e of edges) {
+      const a = nodes.get(e.a), b = nodes.get(e.b); if (!vis(a) || !vis(b)) continue;
+      const dx = b.x - a.x, dy = b.y - a.y, d = Math.sqrt(dx * dx + dy * dy) + .01, f = (d - 110) * .02;
+      a.vx += dx / d * f; a.vy += dy / d * f; b.vx -= dx / d * f; b.vy -= dy / d * f;
+    }
+    for (const n of N) {
+      n.vx -= n.x * .004; n.vy -= n.y * .004;
+      if (!n.fixed && n !== dragNode) { n.x += n.vx * alpha; n.y += n.vy * alpha; }
+      n.vx *= .6; n.vy *= .6;
+    }
+    alpha *= .985; place();
+    if (alpha > .02) raf = requestAnimationFrame(loop);
+  }
+  $('btnRun').onclick = () => { for (const n of nodes.values()) { n.fixed = false; delete manual.pos[n.id]; } save(); render(); heat(1); };
+
+  /* ---------- câmera e interação ---------- */
+  const cam$ = $('cam');
+  const applyCam = () => cam$.setAttribute('transform', `translate(${cam.x},${cam.y}) scale(${cam.k})`);
+  function fit() {
+    const N = [...nodes.values()].filter(vis); if (!N.length) return;
+    setTimeout(() => {
+      const xs = N.map(n => n.x), ys = N.map(n => n.y), r = $('view').getBoundingClientRect();
+      const w = Math.max(...xs) - Math.min(...xs) + 160, h = Math.max(...ys) - Math.min(...ys) + 160;
+      cam.k = Math.min(1.4, r.width / w, r.height / h); cam.x = r.width / 2 - (Math.max(...xs) + Math.min(...xs)) / 2 * cam.k; cam.y = r.height / 2 - (Math.max(...ys) + Math.min(...ys)) / 2 * cam.k; applyCam();
+    }, 700);
+  }
+  const toWorld = (cx, cy) => { const r = $('view').getBoundingClientRect(); return [(cx - r.left - cam.x) / cam.k, (cy - r.top - cam.y) / cam.k]; };
+  $('view').addEventListener('wheel', e => {
+    e.preventDefault(); const r = $('view').getBoundingClientRect(), px = e.clientX - r.left, py = e.clientY - r.top;
+    const nk = Math.min(4, Math.max(.15, cam.k * Math.exp(-e.deltaY * .0015)));
+    cam.x = px - (px - cam.x) * nk / cam.k; cam.y = py - (py - cam.y) * nk / cam.k; cam.k = nk; applyCam();
+  }, { passive: false });
+  let dragNode = null, pan = null, moved = false;
+  $('view').addEventListener('pointerdown', e => {
+    if (e.button !== 0) return; moved = false;
+    const ng = e.target.closest('[data-n]');
+    if (ng) { dragNode = nodes.get(ng.dataset.n); } else pan = { sx: e.clientX, sy: e.clientY, ox: cam.x, oy: cam.y };
+    $('view').setPointerCapture(e.pointerId); if (pan) $('view').classList.add('panning');
+  });
+  $('view').addEventListener('pointermove', e => {
+    if (dragNode) {
+      moved = true; [dragNode.x, dragNode.y] = toWorld(e.clientX, e.clientY); dragNode.fixed = true; place(); heat(.3);
+    } else if (pan) { moved = moved || Math.abs(e.clientX - pan.sx) + Math.abs(e.clientY - pan.sy) > 3; cam.x = pan.ox + e.clientX - pan.sx; cam.y = pan.oy + e.clientY - pan.sy; applyCam(); }
+  });
+  $('view').addEventListener('pointerup', e => {
+    if (dragNode) {
+      if (moved) { manual.pos[dragNode.id] = [Math.round(dragNode.x), Math.round(dragNode.y)]; save(); dragNode.g?.classList.add('pin'); }
+      else select({ k: 'n', id: dragNode.id });
+    } else if (pan && !moved) {
+      const eh = e.target.closest('[data-e]'); select(eh ? { k: 'e', id: +eh.dataset.e } : null);
+    }
+    dragNode = pan = null; $('view').classList.remove('panning');
+  });
+  $('view').addEventListener('dblclick', e => {
+    const ng = e.target.closest('[data-n]'); if (!ng) return;
+    const n = nodes.get(ng.dataset.n); n.fixed = false; delete manual.pos[n.id]; save(); ng.classList.remove('pin'); heat(.6);
+  });
+
+  /* ---------- diálogos ---------- */
+  $('btnNode').onclick = () => $('dlgNode').showModal();
+  $('fNode').onsubmit = e => {
+    if (e.submitter?.value !== 'ok') return;
+    const nome = $('nnNome').value.trim(); if (!nome || nodes.has(nome)) { status('Já existe um nó com esse nome'); return; }
+    manual.nos.push({ nome, tipo: $('nnTipo').value.trim() || 'npc' }); save(); $('fNode').reset(); $('nnTipo').value = 'npc'; rebuild(); heat(.8); select({ k: 'n', id: nome });
+  };
+  function openRel(de) {
+    if (nodes.size < 2) { status('Crie ou carregue pelo menos dois nós'); return; }
+    const opts = [...nodes.keys()].sort((a, b) => a.localeCompare(b, 'pt')).map(n => `<option>${esc(n)}</option>`).join('');
+    $('rA').innerHTML = opts; $('rB').innerHTML = opts; if (de) $('rA').value = de;
+    $('rB').selectedIndex = $('rB').selectedIndex === $('rA').selectedIndex ? 1 : $('rB').selectedIndex;
+    $('rTipo').innerHTML = Object.entries(REL).map(([k, v]) => `<option value="${k}">${v[0]}</option>`).join('');
+    $('dlgRel').showModal();
+  }
+  $('btnRel').onclick = () => openRel(sel?.k === 'n' ? sel.id : null);
+  $('fRel').onsubmit = e => {
+    if (e.submitter?.value !== 'ok') return;
+    if ($('rA').value === $('rB').value) { status('Escolha dois nós diferentes'); return; }
+    manual.rel.push({ a: $('rA').value, b: $('rB').value, tipo: $('rTipo').value, label: $('rLabel').value.trim() }); save(); $('fRel').reset(); rebuild();
+  };
+  $('btnBody').onclick = () => { bodyLinks = !bodyLinks; $('btnBody').classList.toggle('on', bodyLinks); rebuild(); heat(.8); };
+  $('btnLbl').onclick = () => { showLbl = !showLbl; $('btnLbl').classList.toggle('on', showLbl); render(); };
+  $('vault').value = manual.vault || ''; $('vault').oninput = () => { manual.vault = $('vault').value.trim(); save(); renderInfo(); };
+
+  /* ---------- importar / exportar ---------- */
+  $('btnExp').onclick = () => {
+    const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([JSON.stringify({ versao: 1, ...manual }, null, 2)], { type: 'application/json' }));
+    a.download = 'teia-relacoes.json'; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+  };
+  $('btnImp').onclick = () => $('fileJson').click();
+  $('fileJson').onchange = async e => {
+    try {
+      const d = JSON.parse(await e.target.files[0].text()); if (!Array.isArray(d.rel) || !Array.isArray(d.nos)) throw new Error('formato inesperado');
+      manual = { nos: d.nos, rel: d.rel, pos: d.pos || {}, vault: d.vault || manual.vault }; save(); $('vault').value = manual.vault; rebuild(true); status('Importado');
+    } catch (err) { alert('JSON inválido: ' + err.message); }
+  };
+  window.addEventListener('resize', () => {});
+  applyCam(); rebuild(true);
+})();
+</script>
+</body>
+</html>

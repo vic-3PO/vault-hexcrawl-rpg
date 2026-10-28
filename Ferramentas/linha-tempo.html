@@ -1,0 +1,194 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Linha do Tempo</title>
+<link rel="stylesheet" href="tema.css">
+<style>
+  main { padding: 1.2rem 1.2rem 2rem; }
+  header .hoje { display: inline-flex; align-items: center; gap: .4rem; color: var(--tinta-2); font-size: .85rem; }
+  header .hoje input { width: 4.5rem; }
+
+  /* avisos: tiras de papel com a falta marcada */
+  .alerts { display: flex; flex-wrap: wrap; gap: .8rem; margin-bottom: 1.1rem; }
+  .alert { position: relative; padding: .4rem 1rem .4rem 2.3rem; font: 1rem var(--f-titulo); color: var(--tinta); background-color: var(--papel-3); background-image: var(--grao);
+    border-left: 6px solid var(--perigo); box-shadow: 0 1px 0 var(--papel-2), 2px 5px 8px -3px rgb(0 0 0 / .55); rotate: -.5deg; }
+  .alert:nth-child(even) { rotate: .5deg; }
+  .alert::before { content: ""; position: absolute; left: .7rem; top: 50%; width: 1.15rem; height: 1.15rem; margin-top: -.58rem; background: var(--perigo); -webkit-mask: var(--ic-alerta) center / contain no-repeat; mask: var(--ic-alerta) center / contain no-repeat; }
+  .alert.ok { border-left-color: var(--ok); } .alert.ok::before { background: var(--ok); -webkit-mask-image: var(--ic-ok); mask-image: var(--ic-ok); }
+  #empty { max-width: 36rem; margin: 3rem auto; }
+
+  /* livro de registro */
+  .wrap { overflow: auto; max-height: calc(100vh - 190px); border-radius: 2px; background-color: var(--papel); background-image: var(--grao);
+    box-shadow: 0 1px 0 var(--papel-2), 0 2px 0 var(--papel), 0 3px 0 var(--papel-2), 0 16px 26px -12px rgb(0 0 0 / .65); }
+  table { border-collapse: separate; border-spacing: 0; min-width: 100%; }
+  th, td { min-width: 156px; max-width: 156px; padding: .45rem .55rem; border-right: 1px dashed var(--risco); border-bottom: 1px solid var(--risco); vertical-align: top; background: transparent; }
+  thead th { position: sticky; top: 0; z-index: 3; background-color: var(--papel); background-image: var(--grao); border-bottom: 2px solid var(--tinta); font: 700 1rem var(--f-titulo); color: var(--tinta); }
+  th.lane, td.lane { position: sticky; left: 0; min-width: 132px; max-width: 132px; z-index: 2; background-color: var(--papel-2); border-right: 2px solid var(--tinta); font: italic 700 1.02rem var(--f-titulo); color: var(--tinta); }
+  thead th.lane { z-index: 4; }
+  td.today { background: var(--papel-3); box-shadow: inset 3px 0 0 var(--acento), inset -3px 0 0 var(--acento); }
+  th.today { background: var(--acento); color: var(--acento-texto); }
+  td.past { background-image: repeating-linear-gradient(135deg, transparent 0 10px, var(--regua) 10px 11px); } td.past .card { opacity: .8; }
+
+  .card { position: relative; margin-bottom: .45rem; padding: .3rem .5rem; font-size: .86rem; line-height: 1.3; background: var(--papel-3); border: 1px solid var(--risco); border-left: 6px solid var(--c); box-shadow: 1px 2px 0 rgb(var(--sombra) / .22); }
+  .card small { display: block; font: .78rem var(--f-mao); color: var(--tinta-2); text-decoration: none; }
+  .card.late { border-left-color: var(--perigo); background-image: repeating-linear-gradient(135deg, color-mix(in srgb, var(--perigo) 18%, transparent) 0 6px, transparent 6px 12px); }
+  .card.late small { color: var(--perigo); font-weight: 700; }
+  .card.done { opacity: .55; text-decoration: line-through; }
+  .card .x { position: absolute; top: 1px; right: 5px; cursor: pointer; color: var(--tinta-2); display: none; } .card:hover .x { display: block; } .card .x:hover { color: var(--perigo); }
+  .card .chk { cursor: pointer; }
+
+  .legend { margin-top: 1rem; display: flex; gap: 1.3rem; flex-wrap: wrap; font: .9rem var(--f-mao); color: #f3ead3; text-shadow: 0 1px 2px rgb(0 0 0 / .6); }
+  .legend .dot { display: inline-block; width: 12px; height: 12px; border-radius: 2px; margin-right: .4rem; vertical-align: -1px; box-shadow: 0 0 0 1px rgb(0 0 0 / .35); }
+  dialog textarea { font-family: var(--f-mao); }
+</style>
+</head>
+<body>
+<header>
+  <h1><span class="ico i-calendario"></span>Linha do Tempo</h1>
+  <button id="btnDir" class="primary"><span class="ico i-pasta"></span>Abrir pasta do vault…</button>
+  <input id="fileDir" type="file" webkitdirectory multiple hidden>
+  <button id="btnAdd"><span class="ico i-mais"></span>Acontecimento</button>
+  <span class="hoje">Hoje: dia <input id="hoje" type="number" min="0" value="1"></span>
+  <span class="hoje">Campanha: <input id="scope" placeholder="(tudo)" style="width:130px"></span>
+  <span class="spacer"></span><span id="status"></span>
+  <button id="btnImp">Importar</button><input id="fileJson" type="file" accept=".json" hidden>
+  <button id="btnExp">Exportar JSON</button>
+  <button id="btnMd">Exportar .md</button>
+</header>
+<main>
+  <div id="alerts" class="alerts"></div>
+  <div id="empty" class="empty"><p>Abra o vault ou adicione acontecimentos</p>
+    <p>Relógios, eventos e prazos de missão vêm das notas. O que o mundo faz fora de cena (ações de facção, rumores) você registra à mão.</p></div>
+  <div class="wrap" id="wrap" hidden><table id="tbl"></table></div>
+  <div class="legend" id="legend"></div>
+</main>
+
+<dialog id="dlg"><form method="dialog" id="form"><h3 style="margin-top:0">Novo acontecimento</h3>
+  <div class="row"><div><label>Dia</label><input id="fDia" type="number" min="0" required></div>
+  <div><label>Faixa</label><select id="fLane"><option value="mundo">Mundo / facções (fora de cena)</option><option value="sessao">Sessões</option><option value="outro">Outro</option></select></div></div>
+  <label>Título</label><input id="fTit" required placeholder="ex.: Culto toma o porto">
+  <label>Quem / onde (opcional)</label><input id="fQuem" placeholder="ex.: Filhos do Fogo — Ancorado">
+  <label>Detalhe (opcional)</label><textarea id="fDet" rows="3"></textarea>
+  <div class="row" style="margin-top:14px"><button class="primary" value="ok">Adicionar</button><button value="x" formnovalidate>Cancelar</button></div></form></dialog>
+
+<script src="autosave.js" data-tool="linha-tempo"></script>
+<script>
+(() => {
+  'use strict';
+  const $ = id => document.getElementById(id);
+  const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
+  const IGNORE = /^(\.|node_modules$|graphify-out$|Ferramentas$)/;
+  const LANES = { relogio: ['Relógios', '#c8553d'], evento: ['Eventos', '#e0813a'], missao: ['Missões', '#5b9bd5'],
+                  mundo: ['Mundo / facções', '#9b6bd1'], sessao: ['Sessões', '#4caf6e'], outro: ['Outro', '#8d8d8d'] };
+  let notas = [], manual = [], hojeManual = false;
+  try { manual = JSON.parse(localStorage.getItem('linha-tempo:manual')) || []; } catch (e) {}
+  const save = () => { try { localStorage.setItem('linha-tempo:manual', JSON.stringify(manual)); } catch (e) {} };
+  let stT; const status = t => { $('status').textContent = t; clearTimeout(stT); stT = setTimeout(() => $('status').textContent = '', 3000); };
+
+  function parseFm(text) {
+    const m = text.match(/^---\r?\n([\s\S]*?)\r?\n---/); const fm = {}; if (!m) return fm;
+    for (const l of m[1].split(/\r?\n/)) { const k = l.match(/^([^:#\s][^:]*):\s*(.*)$/); if (!k) continue; let v = k[2].trim().replace(/^["']|["']$/g, ''); if (/^-?\d+$/.test(v)) v = Number(v); fm[k[1].trim()] = v; }
+    return fm;
+  }
+  const semLink = v => String(v ?? '').replace(/\[\[([^\]|]+)(?:\|[^\]]*)?\]\]/g, '$1');
+  async function walk(dir, prefix, out) {
+    for await (const [nome, h] of dir.entries()) {
+      if (IGNORE.test(nome)) continue;
+      if (h.kind === 'directory') await walk(h, prefix + nome + '/', out); else if (nome.endsWith('.md')) out.push({ path: prefix + nome, nome: nome.replace(/\.md$/, ''), get: async () => (await h.getFile()).text() });
+    }
+  }
+  async function ingest(lista) {
+    notas = [];
+    for (const it of lista) { const fm = parseFm(await it.get()); if (['relógio', 'evento'].includes(fm.tipo) || String(fm.tipo).startsWith('missão')) notas.push({ path: it.path, nome: it.nome, fm }); }
+    hojeManual = false; status(`${notas.length} notas lidas`); render();
+  }
+  $('btnDir').onclick = async () => {
+    if (window.showDirectoryPicker) { try { const d = await window.showDirectoryPicker(); const l = []; await walk(d, '', l); await ingest(l); } catch (e) { if (e.name !== 'AbortError') status('Erro: ' + e.message); } }
+    else $('fileDir').click();
+  };
+  $('fileDir').onchange = async e => {
+    await ingest([...e.target.files].filter(f => f.name.endsWith('.md') && !f.webkitRelativePath.split('/').some(p => IGNORE.test(p)))
+      .map(f => ({ path: f.webkitRelativePath.split('/').slice(1).join('/'), nome: f.name.replace(/\.md$/, ''), get: () => f.text() })));
+  };
+  const noEscopo = n => !$('scope').value.trim() || n.path.toLowerCase().includes($('scope').value.trim().toLowerCase());
+
+  /* "hoje" vem do primeiro relógio, a menos que o usuário mude o campo */
+  function hoje() {
+    if (hojeManual) return Number($('hoje').value) || 0;
+    const r = notas.find(n => n.fm.tipo === 'relógio' && noEscopo(n));
+    if (r && Number.isFinite(Number(r.fm.dia_atual))) { $('hoje').value = r.fm.dia_atual; return Number(r.fm.dia_atual); }
+    return Number($('hoje').value) || 0;
+  }
+  $('hoje').oninput = () => { hojeManual = true; render(); };
+  $('scope').oninput = render;
+
+  function entradas() {
+    const out = [];
+    for (const n of notas.filter(noEscopo)) {
+      const f = n.fm, estado = f.estado || '', fechada = ['ocorrido', 'concluída', 'falhou'].includes(estado);
+      if (f.tipo === 'relógio' && Number.isFinite(Number(f.dia_prazo))) out.push({ dia: +f.dia_prazo, lane: 'relogio', titulo: `Prazo: ${n.nome.replace(/^Relógio\s*[-—]\s*/, '')}`, det: f.prazo, done: false, late: false, estado: 'prazo final' });
+      else if (f.tipo === 'evento' && Number.isFinite(Number(f.dia))) out.push({ dia: +f.dia, lane: 'evento', titulo: n.nome.replace(/^Dia \d+\s*[-—]\s*/, ''), det: semLink(f.local), done: fechada, late: !fechada && +f.dia < hoje(), estado });
+      else if (String(f.tipo).startsWith('missão') && Number.isFinite(Number(f.dia_prazo))) out.push({ dia: +f.dia_prazo, lane: 'missao', titulo: n.nome, det: f.prazo, done: fechada, late: !fechada && +f.dia_prazo < hoje(), estado });
+    }
+    manual.forEach((m, i) => out.push({ dia: m.dia, lane: m.lane, titulo: m.titulo, det: [m.quem, m.det].filter(Boolean).join(' — '), done: !!m.feito, late: false, estado: m.feito ? 'feito' : '', manual: i }));
+    return out;
+  }
+
+  function render() {
+    const es = entradas(), h = hoje();
+    $('empty').hidden = es.length > 0; $('wrap').hidden = !es.length;
+    const atrasados = es.filter(e => e.late);
+    $('alerts').innerHTML = !es.length ? '' : atrasados.length
+      ? atrasados.map(e => `<div class="alert">${esc(e.titulo)} — dia ${e.dia}, ${h - e.dia} ${h - e.dia === 1 ? 'dia' : 'dias'} de atraso</div>`).join('')
+      : '<div class="alert ok">Nada atrasado.</div>';
+    if (!es.length) { $('legend').innerHTML = ''; return; }
+    const max = Math.max(...es.map(e => e.dia), h, 1), min = Math.min(0, ...es.map(e => e.dia));
+    const dias = []; for (let d = Math.max(1, min); d <= max; d++) dias.push(d);
+    const usadas = Object.keys(LANES).filter(l => es.some(e => e.lane === l) || ['mundo', 'sessao'].includes(l));
+    const cls = d => (d === h ? 'today' : d < h ? 'past' : '');
+    $('tbl').innerHTML = `<thead><tr><th class="lane">Faixa</th>${dias.map(d => `<th class="${cls(d)}">Dia ${d}${d === h ? ' · hoje' : ''}</th>`).join('')}</tr></thead><tbody>` +
+      usadas.map(l => `<tr><td class="lane">${LANES[l][0]}</td>${dias.map(d => `<td class="${cls(d)}">${es.filter(e => e.lane === l && e.dia === d).map(cardHtml).join('')}</td>`).join('')}</tr>`).join('') + '</tbody>';
+    $('legend').innerHTML = usadas.map(l => `<span><i class="dot" style="background:${LANES[l][1]}"></i>${LANES[l][0]}</span>`).join('');
+    const hoje$ = $('tbl').querySelector('th.today'); if (hoje$ && !render.scrolled) { $('wrap').scrollLeft = hoje$.offsetLeft - 300; render.scrolled = true; }
+  }
+  const cardHtml = e => `<div class="card ${e.late ? 'late' : ''} ${e.done ? 'done' : ''}" style="--c:${LANES[e.lane][1]}">
+    ${e.manual != null ? `<span class="x" data-del="${e.manual}" title="Excluir">✕</span>` : ''}
+    ${e.manual != null ? `<span class="chk" data-chk="${e.manual}" title="Marcar como feito">${e.done ? '☑' : '☐'}</span> ` : ''}${esc(e.titulo)}
+    <small>${e.late ? 'atrasado · ' : ''}${esc(e.estado)}${e.det ? (e.estado ? ' · ' : '') + esc(e.det) : ''}</small></div>`;
+  $('tbl').onclick = e => {
+    const del = e.target.closest('[data-del]'), chk = e.target.closest('[data-chk]');
+    if (del && confirm('Excluir este acontecimento?')) { manual.splice(+del.dataset.del, 1); save(); render(); }
+    else if (chk) { const m = manual[+chk.dataset.chk]; m.feito = !m.feito; save(); render(); }
+  };
+
+  $('btnAdd').onclick = () => { $('fDia').value = hoje() || 1; $('dlg').showModal(); };
+  $('form').onsubmit = e => {
+    if (e.submitter?.value !== 'ok') return;
+    manual.push({ dia: Number($('fDia').value), lane: $('fLane').value, titulo: $('fTit').value.trim(), quem: $('fQuem').value.trim(), det: $('fDet').value.trim() });
+    save(); $('form').reset(); render();
+  };
+
+  const baixa = (nome, texto, tipo) => { const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([texto], { type: tipo })); a.download = nome; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 2000); };
+  $('btnExp').onclick = () => baixa('linha-do-tempo.json', JSON.stringify({ versao: 1, manual }, null, 2), 'application/json');
+  $('btnImp').onclick = () => $('fileJson').click();
+  $('fileJson').onchange = async e => {
+    try { const d = JSON.parse(await e.target.files[0].text()); if (!Array.isArray(d.manual)) throw new Error('formato inesperado'); manual = d.manual; save(); render(); status('Importado'); }
+    catch (err) { alert('JSON inválido: ' + err.message); }
+  };
+  $('btnMd').onclick = () => {
+    const es = entradas().sort((a, b) => a.dia - b.dia);
+    let md = `---\ntipo: linha-do-tempo\ndia_atual: ${hoje()}\n---\n\n# Linha do tempo da campanha\n\n`;
+    let dia = null;
+    for (const e of es) {
+      if (e.dia !== dia) { dia = e.dia; md += `\n## Dia ${dia}\n\n`; }
+      md += `- [${e.done ? 'x' : ' '}] **${LANES[e.lane][0]}** — ${e.titulo}${e.det ? ' (' + e.det + ')' : ''}${e.late ? ' ⚠ atrasado' : ''}\n`;
+    }
+    baixa('Linha do tempo.md', md, 'text/markdown');
+  };
+  render();
+})();
+</script>
+</body>
+</html>

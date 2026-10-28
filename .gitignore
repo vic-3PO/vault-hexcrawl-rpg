@@ -17,3 +17,10 @@ desktop.ini
 # Ferramentas locais (Claude Code, graphify)
 .claude/
 graphify-out/
+
+# Ferramentas HTML: autosave local (a pasta fica no repositório, o conteúdo não)
+Ferramentas/autosave/*
+!Ferramentas/autosave/.gitkeep
+
+# Ferramentas HTML: texturas opcionais (a licença das imagens não foi verificada; veja Ferramentas/README.md)
+Ferramentas/img/

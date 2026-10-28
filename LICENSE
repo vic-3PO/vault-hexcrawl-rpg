@@ -5,15 +5,17 @@ Este repositório usa duas licenças, conforme o tipo de arquivo:
    (CC BY-SA 4.0). Texto completo na Parte 2 abaixo.
    https://creativecommons.org/licenses/by-sa/4.0/deed.pt_BR
 
-2. CÓDIGO (arquivos dentro de scripts/): licença MIT. Texto na Parte 1 abaixo.
+2. CÓDIGO (arquivos dentro de scripts/ e Ferramentas/, isto é, os scripts e as
+   ferramentas em HTML, CSS e JavaScript): licença MIT. Texto na Parte 1 abaixo.
 
-Os plugins Templater e Dataview (em .obsidian/plugins, se presentes) têm suas
+As texturas opcionais em Ferramentas/img/ não fazem parte deste repositório e
+têm as licenças dos seus autores. Os plugins Templater e Dataview (em .obsidian/plugins, se presentes) têm suas
 próprias licenças e não fazem parte deste repositório. Os vídeos e canais
 citados nas referências pertencem a seus autores; este repositório só os cita
 e resume com palavras próprias.
 
 ================================================================================
-PARTE 1 — MIT (somente scripts/)
+PARTE 1 — MIT (scripts/ e Ferramentas/)
 ================================================================================
 
 MIT License
@@ -39,7 +41,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 
 ================================================================================
-PARTE 2 — CC BY-SA 4.0 (todo o conteúdo fora de scripts/)
+PARTE 2 — CC BY-SA 4.0 (todo o conteúdo fora de scripts/ e Ferramentas/)
 ================================================================================
 
 Copyright (c) 2026 os autores deste repositório

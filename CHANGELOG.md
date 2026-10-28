@@ -2,6 +2,14 @@
 
 Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/).
 
+## [0.2.0] - 2026-10-28
+
+### Adicionado
+- Pasta `Ferramentas/` com cinco ferramentas em HTML, CSS e JavaScript, que abrem direto no navegador: **Mapa Wiki** (marcadores móveis, camadas e grade hexagonal), **Painel de Relógios**, **Teia de Relações**, **Linha do Tempo** e **Painel de Sessão**. Veja [`Ferramentas/README.md`](Ferramentas/README.md).
+- Leitura do vault pelo frontmatter e, no Chrome e no Edge, gravação do dia e do estado de volta nas notas.
+- Autosave em arquivo (`Ferramentas/autosave/`, ignorada pelo git), com Restaurar, Backup e Limpar tudo.
+- Tema próprio "a mesa do mestre" (`Ferramentas/tema.css`), claro e escuro, com texturas opcionais.
+
 ## [0.1.0] - 2026-10-14
 
 Primeira publicação.

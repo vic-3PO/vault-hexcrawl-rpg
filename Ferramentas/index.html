@@ -1,0 +1,127 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Ferramentas do Vault</title>
+<link rel="stylesheet" href="tema.css">
+<style>
+  main { max-width: 1120px; margin: 0 auto; padding: 2.2rem 1.2rem 3rem; }
+
+  /* etiqueta de capa */
+  .capa { display: inline-block; position: relative; padding: 1.1rem 2rem 1.2rem; margin: .6rem 0 2.4rem .4rem; transform: rotate(-1.4deg); max-width: 100%; }
+  .capa h1 { font-size: clamp(2rem, 5vw, 3.1rem); font-weight: 700; letter-spacing: -.01em; }
+  .capa p { margin: .3rem 0 0; font-family: var(--f-mao); font-size: 1rem; color: var(--tinta-2); transform: rotate(.6deg); }
+
+  /* a mesa: objetos soltos, tamanhos e ângulos diferentes */
+  .mesa { display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); gap: 2.2rem 1.6rem; align-items: center; }
+  .obj { --r: 0deg; display: block; position: relative; color: var(--tinta); text-decoration: none; transform: rotate(var(--r)); transition: transform .18s cubic-bezier(.3, 1.4, .5, 1), filter .18s; filter: drop-shadow(0 12px 14px rgb(0 0 0 / .5)); }
+  .obj:hover, .obj:focus-visible { transform: rotate(0deg) translateY(-6px) scale(1.02); }
+  .obj:focus-visible { outline-offset: 8px; }
+  .obj h2 { font-size: 1.55rem; margin: 0 0 .3rem; display: block; } .obj h2::after { display: none; }
+  .obj p { margin: 0; font-size: .95rem; }
+  .obj .ico { width: 2.6rem; height: 2.6rem; }
+
+  /* mapa dobrado */
+  .mapa { --r: -1.3deg; grid-column: 1 / 8; padding: 2rem 2.2rem 2rem 2.4rem; min-height: 230px; background-color: var(--papel); border-radius: 2px;
+    background-image:
+      linear-gradient(90deg, transparent 33.2%, rgb(0 0 0 / .13) 33.4%, rgb(255 255 255 / .22) 33.8%, transparent 34.5%, transparent 66%, rgb(0 0 0 / .13) 66.3%, rgb(255 255 255 / .22) 66.8%, transparent 67.5%),
+      linear-gradient(0deg, transparent 49.4%, rgb(0 0 0 / .1) 50%, rgb(255 255 255 / .2) 50.6%, transparent 51.4%),
+      repeating-linear-gradient(60deg, transparent 0 22px, var(--regua) 22px 23px), var(--grao); }
+  .mapa .ico { position: absolute; right: 1.6rem; top: 1.4rem; width: 5.5rem; height: 5.5rem; color: var(--risco); }
+  .mapa h2 { font-size: 2.1rem; position: relative; } .mapa p { max-width: 24rem; font-size: 1.02rem; position: relative; }
+  @media (max-width: 860px) { .mapa .ico { opacity: .3; } }
+
+  /* ficha redonda de madeira */
+  .relogio { --r: 2.5deg; grid-column: 8 / 13; aspect-ratio: 1; border-radius: 50%; display: grid; place-content: center; text-align: center; padding: 2.2rem; color: #f3ead3;
+    background: radial-gradient(circle at 35% 30%, rgb(255 255 255 / .12), transparent 55%), repeating-radial-gradient(circle at 50% 50%, transparent 0 5px, rgb(0 0 0 / .1) 5px 6px), linear-gradient(var(--madeira), var(--madeira-2));
+    box-shadow: inset 0 0 0 7px #120b05, inset 0 0 0 9px var(--veio), inset 0 0 0 16px var(--madeira-2), inset 0 0 0 17px #7a5d3a; }
+  .relogio .ico { margin: 0 auto .5rem; } .relogio h2 { font-size: 1.5rem; } .relogio p { font-size: .88rem; color: #d8cba8; max-width: 13rem; margin: 0 auto; }
+
+  /* cortiça com tachinha */
+  .teia { --r: 1.6deg; grid-column: 1 / 6; padding: 2.6rem 1.8rem 1.8rem; border-radius: 3px; min-height: 230px;
+    background-color: var(--cortica); background-image: linear-gradient(var(--veu-cortica), var(--veu-cortica)), var(--cortica-img); background-size: auto, 650px, 260px; box-shadow: inset 0 0 0 7px #5a3d22, inset 0 0 0 8px rgb(0 0 0 / .4); }
+  .teia::before { content: ""; position: absolute; top: 14px; left: 50%; width: 22px; height: 22px; margin-left: -11px; border-radius: 50%; background: radial-gradient(circle at 35% 30%, #ff9b86, var(--perigo) 55%, #5b0f06); box-shadow: 2px 4px 3px rgb(0 0 0 / .45); z-index: 2; }
+  .teia .ficha { position: relative; padding: .9rem 1rem 1rem; background-color: var(--papel-3); background-image: var(--grao); transform: rotate(-2deg); box-shadow: 0 6px 10px -4px rgb(0 0 0 / .5); }
+  .teia svg.fio { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+  .teia .ico { color: var(--tinta); width: 2rem; height: 2rem; float: right; margin-left: .4rem; }
+
+  /* bloco de calendário */
+  .calendario { --r: -2deg; grid-column: 6 / 9; background-color: var(--papel-3); background-image: var(--grao); border-radius: 3px; overflow: hidden; }
+  .calendario .topo { background: var(--acento); color: var(--acento-texto); padding: .9rem 1.1rem .7rem; position: relative; }
+  .calendario .topo::before, .calendario .topo::after { content: ""; position: absolute; top: -9px; width: 14px; height: 24px; border-radius: 8px; background: #120b05; box-shadow: inset 0 -3px 0 #3a3a3a; }
+  .calendario .topo::before { left: 22%; } .calendario .topo::after { right: 22%; }
+  .calendario .topo h2 { font-size: 1.3rem; margin: 0; }
+  .calendario .corpo { padding: .9rem 1.1rem 1.1rem; }
+  .calendario .dias { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; margin-top: .7rem; }
+  .calendario .dias i { aspect-ratio: 1; border: 1px solid var(--risco); border-radius: 2px; position: relative; }
+  .calendario .dias i.hoje::after { content: ""; position: absolute; inset: -3px; border: 2px solid var(--perigo); border-radius: 50%; transform: rotate(-8deg) scaleX(1.2); }
+  .calendario .dias i.risca::before { content: ""; position: absolute; inset: 0; background: linear-gradient(45deg, transparent 46%, var(--tinta-2) 46% 54%, transparent 54%); }
+
+  /* escudo do mestre: três painéis dobrados */
+  .escudo { --r: 1.1deg; grid-column: 9 / 13; display: grid; grid-template-columns: .55fr 1.2fr .55fr; min-height: 250px; }
+  .escudo > span, .escudo > div { background-color: #2b3243; background-image: var(--fibra-escura), repeating-linear-gradient(0deg, rgb(255 255 255 / .03) 0 2px, transparent 2px 5px); box-shadow: inset 0 0 0 5px #1a1f2c, inset 0 0 0 6px #556080; }
+  .escudo > span:first-child { transform: skewY(3deg); transform-origin: right; border-radius: 4px 0 0 4px; }
+  .escudo > span:last-child { transform: skewY(-3deg); transform-origin: left; border-radius: 0 4px 4px 0; }
+  .escudo > div { padding: 1.2rem .9rem; color: #ece5d1; text-align: center; display: grid; place-content: center; position: relative; z-index: 1; }
+  .escudo .ico { margin: 0 auto .4rem; } .escudo h2 { font-size: 1.3rem; } .escudo p { font-size: .85rem; color: #b9bfd0; }
+
+  .nota { margin: 2.6rem 0 0 auto; max-width: 30rem; padding: 1rem 1.3rem; transform: rotate(.8deg); font-family: var(--f-mao); font-size: .92rem; line-height: 1.6; }
+
+  @media (max-width: 860px) {
+    .mesa { grid-template-columns: 1fr; }
+    .mapa, .relogio, .teia, .calendario, .escudo { grid-column: 1; }
+    .relogio { width: min(100%, 320px); margin-inline: auto; }
+  }
+</style>
+</head>
+<body>
+<main>
+  <div class="capa folha fita">
+    <h1>Ferramentas do Vault</h1>
+    <p>Abrem direto no navegador. Seus dados ficam neste computador e saem em JSON ou .md.</p>
+  </div>
+
+  <div class="mesa">
+    <a class="obj mapa" href="mapa-wiki.html">
+      <span class="ico i-mapa"></span>
+      <h2>Mapa Wiki</h2>
+      <p>Solte selos de cera sobre o mapa, ligue cada um a uma nota e filtre por camada. Tem grade hexagonal para o hexcrawl.</p>
+    </a>
+
+    <a class="obj relogio" href="painel-relogios.html">
+      <div><span class="ico i-relogio"></span>
+      <h2>Relógios</h2>
+      <p>Avance o dia e veja o prazo se fechar.</p></div>
+    </a>
+
+    <a class="obj teia" href="teia-relacoes.html">
+      <svg class="fio" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true"><path d="M50 8 C 30 40, 85 50, 70 92" fill="none" stroke="#a8301f" stroke-width=".9" vector-effect="non-scaling-stroke" stroke-dasharray="1 0"/></svg>
+      <div class="ficha">
+        <span class="ico i-teia"></span>
+        <h2>Teia de Relações</h2>
+        <p>Quem odeia quem, quem deve favor a quem.</p>
+      </div>
+    </a>
+
+    <a class="obj calendario" href="linha-tempo.html">
+      <div class="topo"><h2>Linha do Tempo</h2></div>
+      <div class="corpo">
+        <p>O que já passou, o que atrasou e o que o mundo fez sozinho.</p>
+        <div class="dias" aria-hidden="true"><i class="risca"></i><i class="risca"></i><i class="risca"></i><i class="hoje"></i><i></i><i></i><i></i></div>
+      </div>
+    </a>
+
+    <a class="obj escudo" href="painel-sessao.html">
+      <span aria-hidden="true"></span>
+      <div><span class="ico i-dado"></span>
+      <h2>Sessão</h2>
+      <p>Iniciativa, PV, cenas, dados e o resumo da noite.</p></div>
+      <span aria-hidden="true"></span>
+    </a>
+  </div>
+
+  <p class="nota folha fita">As ferramentas que leem o vault pedem a pasta raiz, por exemplo <b>base-campanha</b>. No Chrome e no Edge elas gravam de volta nas notas; nos outros navegadores você baixa a nota atualizada.</p>
+</main>
+</body>
+</html>

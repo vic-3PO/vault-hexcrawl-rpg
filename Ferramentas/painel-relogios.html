@@ -1,0 +1,323 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Painel de Relógios</title>
+<link rel="stylesheet" href="tema.css">
+<style>
+  main { padding: 1.2rem 1.2rem 3rem; max-width: 1240px; margin: 0 auto; }
+  #empty { max-width: 36rem; margin: 3rem auto; }
+
+  /* títulos de seção: etiquetas coladas na mesa */
+  #app > h2 { display: inline-flex; margin: 2rem 0 1.1rem; padding: .3rem 1.1rem; font-size: 1.15rem; background-color: var(--papel); background-image: var(--grao);
+    transform: rotate(-.7deg); box-shadow: 0 1px 0 var(--papel-2), 0 5px 10px -4px rgb(0 0 0 / .55); }
+  #app > h2::after { display: none; }
+  #app > h2:first-child { margin-top: .6rem; }
+
+  /* relógios: cartas */
+  .clocks { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 1.7rem 1.4rem; padding-top: .6rem; }
+  .clock { --r: 0deg; position: relative; text-align: center; padding: 1.5rem 1rem 1rem; cursor: pointer; border-radius: 7px; transform: rotate(var(--r));
+    background-color: var(--papel-3); background-image: var(--grao); transition: transform .16s ease;
+    box-shadow: inset 0 0 0 6px var(--papel-3), inset 0 0 0 7.5px var(--tinta), 0 1px 0 var(--papel-2), 0 2px 0 var(--papel), 0 3px 0 var(--papel-2), 0 18px 26px -12px rgb(0 0 0 / .7); }
+  .clock:nth-child(odd) { --r: -.8deg; } .clock:nth-child(even) { --r: .7deg; }
+  .clock:hover { transform: rotate(0) translateY(-4px); }
+  .clock.sel { outline: 3px solid var(--foco); outline-offset: 5px; }
+  .clock h3 { font-size: 1.28rem; margin: 0 0 .1rem; }
+  .clock .sub { min-height: 1.4em; font-family: var(--f-mao); font-size: .82rem; color: var(--tinta-2); }
+  .clock svg { width: 180px; height: 180px; margin: .3rem auto; display: block; filter: url(#tinta); overflow: visible; }
+  .seg { stroke: var(--tinta); stroke-width: 1.6; stroke-linejoin: round; transition: fill .35s; }
+  .seg[fill="#3a3027"] { fill: var(--papel-2); }
+  .clock svg text { fill: var(--tinta); } .clock svg .small { font: italic 11px var(--f-titulo); fill: var(--tinta-2); }
+  .big { font: 700 36px var(--f-titulo); }
+  .caveira { fill: none; stroke: var(--perigo); stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round; }
+  .clock .ctrl { display: flex; gap: .5rem; justify-content: center; align-items: center; margin-top: .3rem; }
+  .clock .ctrl b { font: 700 1.05rem var(--f-titulo); min-width: 4.5rem; }
+  .clock .ctrl button { min-width: 38px; justify-content: center; }
+  .clock .link { margin-top: .5rem; display: flex; gap: .5rem; justify-content: center; align-items: center; flex-wrap: wrap; }
+  .clock .link button { font-size: .8rem; min-height: 28px; padding: .15em .6em; }
+  .dirty { font-family: var(--f-mao); color: var(--aviso); font-size: .8rem; }
+  .clock .tag { position: absolute; top: 16px; right: 16px; font: italic .78rem var(--f-titulo); color: var(--tinta-2); border-bottom: 1px dotted var(--tinta-2); }
+  .clock .tag.manual { color: var(--acento); border-color: var(--acento); }
+  /* faixa de estado: o relógio conta o que está acontecendo, não só a cor */
+  .clock::before { content: "em calma"; position: absolute; top: -11px; left: 50%; translate: -50% 0; rotate: -2deg; padding: .1rem .9rem; background: var(--ok); color: #fff;
+    font: 700 .82rem var(--f-titulo); box-shadow: 0 2px 4px rgb(0 0 0 / .4); clip-path: polygon(0 0, 100% 0, 96% 50%, 100% 100%, 0 100%, 4% 50%); }
+  .clock:has(.seg[fill="var(--warn)"])::before { content: "tensão"; background: var(--aviso); }
+  .clock:has(.seg[fill="var(--bad)"])::before { content: "crítico"; background: var(--perigo); }
+
+  /* linha do tempo: calendário de campanha */
+  .timeline { display: flex; gap: 0; overflow-x: auto; background-color: var(--papel); background-image: var(--grao); border-radius: 2px;
+    box-shadow: 0 1px 0 var(--papel-2), 0 2px 0 var(--papel), 0 3px 0 var(--papel-2), 0 14px 22px -10px rgb(0 0 0 / .6); }
+  .day { flex: 0 0 156px; min-height: 150px; padding: .5rem .65rem .7rem; border-right: 1px solid var(--risco); position: relative; }
+  .day .n { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: .55rem; padding-bottom: .25rem; border-bottom: 2px solid var(--tinta); font: 700 1.1rem var(--f-titulo); }
+  .day .n span:last-child { font: 400 .8rem var(--f-mao); color: #fff; background: var(--perigo); padding: 0 .5rem; rotate: -4deg; border-radius: 2px; }
+  .day .n span:last-child:empty { display: none; }
+  .day.today { background: color-mix(in srgb, var(--acento) 14%, transparent); box-shadow: inset 0 5px 0 var(--acento); }
+  .day.past { opacity: .72; background-image: repeating-linear-gradient(135deg, transparent 0 10px, var(--regua) 10px 11px); }
+  .chip { display: block; width: 100%; text-align: left; font: .85rem/1.3 var(--f-corpo); min-height: 0; padding: .3rem .5rem; margin-bottom: .4rem; border-radius: 2px; background: var(--papel-3);
+    border: 1px solid var(--risco); border-left: 5px solid var(--tinta-2); box-shadow: 1px 2px 0 rgb(var(--sombra) / .25); transform: none; }
+  .chip:hover { transform: none; box-shadow: 2px 3px 0 rgb(var(--sombra) / .4); } .chip:active { transform: translate(1px, 1px); box-shadow: none; }
+  .chip small { display: block; font: .78rem var(--f-mao); color: var(--tinta-2); }
+  .chip.evento.pendente { border-left-color: var(--aviso); } .chip.evento.ocorrido { border-left-color: var(--ok); text-decoration: line-through; opacity: .65; }
+  .chip.atrasado { border-left-color: var(--perigo); background-image: repeating-linear-gradient(135deg, color-mix(in srgb, var(--perigo) 18%, transparent) 0 6px, transparent 6px 12px); }
+  .chip.atrasado small { color: var(--perigo); font-weight: 700; }
+  .chip.missao { border-left-color: var(--acento); } .chip.missao.vencida { border-left-color: var(--perigo); color: var(--perigo); }
+
+  #missions table { background-color: var(--papel); background-image: var(--grao); box-shadow: 0 1px 0 var(--papel-2), 0 2px 0 var(--papel), 0 3px 0 var(--papel-2), 0 14px 22px -10px rgb(0 0 0 / .6); }
+  #missions th { padding: .6rem .8rem; } #missions td { padding: .5rem .8rem; }
+  dialog label { margin-top: .8rem; }
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>
+  <filter id="tinta" x="-6%" y="-6%" width="112%" height="112%"><feTurbulence type="fractalNoise" baseFrequency=".035" numOctaves="2" seed="7" result="n"/><feDisplacementMap in="SourceGraphic" in2="n" scale="3.2"/></filter>
+</defs></svg>
+<header>
+  <h1><span class="ico i-relogio"></span>Painel de Relógios</h1>
+  <button id="btnDir" class="primary"><span class="ico i-pasta"></span>Abrir pasta do vault…</button>
+  <input id="fileDir" type="file" webkitdirectory multiple hidden>
+  <button id="btnNew"><span class="ico i-mais"></span>Relógio manual</button>
+  <label style="color:var(--muted);font-size:12px">Campanha:
+    <input id="scope" type="text" placeholder="(vault inteiro)" title="Só lê notas cujo caminho contém este texto, ex.: 01 - Exemplo" style="width:150px">
+  </label>
+  <span class="spacer"></span>
+  <span id="status"></span>
+</header>
+
+<main>
+  <div id="empty" class="empty">
+    <p>Abra a pasta do seu vault</p>
+    <p>Leio as notas com <code>tipo: relógio</code>, <code>evento</code> e <code>missão-*</code> (campos <code>dia</code>, <code>dia_prazo</code>, <code>dia_atual</code>, <code>estado</code>).<br>
+    No Chrome/Edge posso gravar as mudanças de volta nas notas; nos outros navegadores você baixa a nota atualizada.</p>
+  </div>
+  <div id="app" hidden>
+    <h2>Relógios</h2>
+    <div class="clocks" id="clocks"></div>
+    <h2 id="tlTitle">Linha do tempo</h2>
+    <div class="timeline" id="timeline"></div>
+    <h2>Missões com prazo</h2>
+    <div id="missions"></div>
+  </div>
+</main>
+
+<dialog id="dlgNew">
+  <form method="dialog" id="formNew">
+    <h3 style="margin-top:0">Novo relógio manual</h3>
+    <label>Nome</label><input id="nNome" required placeholder="Ritual, Cerco, Maré…">
+    <label>Dia do prazo (número de segmentos)</label><input id="nPrazo" type="number" min="2" max="24" value="7" required>
+    <label>Consequência no prazo</label><input id="nCons" placeholder="O que acontece se ninguém intervir">
+    <div style="display:flex;gap:8px;margin-top:14px"><button class="primary" value="ok">Criar</button><button value="cancel" formnovalidate>Cancelar</button></div>
+  </form>
+</dialog>
+
+<script src="autosave.js" data-tool="painel-relogios"></script>
+<script>
+(() => {
+  'use strict';
+  const $ = id => document.getElementById(id);
+  const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  const IGNORE = /^(\.|node_modules$|graphify-out$|Ferramentas$)/;
+
+  let notas = [];            // {path, nome, text, fm, handle, dirty, file}
+  let manuais = load();      // relógios manuais (localStorage)
+  let selecionado = null;    // chave do relógio que define "hoje" na linha do tempo
+
+  function load() { try { return JSON.parse(localStorage.getItem('painel-relogios:manuais')) || []; } catch (e) { return []; } }
+  function saveManuais() { try { localStorage.setItem('painel-relogios:manuais', JSON.stringify(manuais)); } catch (e) {} }
+  let stT; function status(t, err) { const s = $('status'); s.textContent = t; s.className = err ? 'err' : ''; clearTimeout(stT); stT = setTimeout(() => s.textContent = '', 3500); }
+
+  /* ---------- leitura do vault ---------- */
+  function parseFm(text) {
+    const m = text.match(/^---\r?\n([\s\S]*?)\r?\n---/); const fm = {};
+    if (!m) return fm;
+    for (const l of m[1].split(/\r?\n/)) {
+      const k = l.match(/^([^:#\s][^:]*):\s*(.*)$/); if (!k) continue;
+      let v = k[2].trim().replace(/^["']|["']$/g, '');
+      if (/^-?\d+$/.test(v)) v = Number(v);
+      fm[k[1].trim()] = v;
+    }
+    return fm;
+  }
+  const limpaLink = v => String(v ?? '').replace(/\[\[([^\]|]+)(?:\|[^\]]*)?\]\]/g, '$1');
+
+  async function walk(dirHandle, prefix, out) {
+    for await (const [nome, h] of dirHandle.entries()) {
+      if (IGNORE.test(nome)) continue;
+      if (h.kind === 'directory') await walk(h, prefix + nome + '/', out);
+      else if (nome.endsWith('.md')) out.push({ path: prefix + nome, nome: nome.replace(/\.md$/, ''), handle: h });
+    }
+  }
+  async function ingest(lista) {
+    notas = [];
+    for (const it of lista) {
+      const file = it.handle ? await it.handle.getFile() : it.file;
+      const text = await file.text();
+      const fm = parseFm(text);
+      if (fm.tipo) notas.push({ ...it, text, fm, dirty: false });
+    }
+    const n = notas.filter(n => n.fm.tipo === 'relógio' || n.fm.tipo === 'evento' || String(n.fm.tipo).startsWith('missão')).length;
+    status(`${n} notas relevantes lidas de ${lista.length} .md`);
+    selecionado = null; render();
+  }
+  $('btnDir').onclick = async () => {
+    if (window.showDirectoryPicker) {
+      try {
+        const dir = await window.showDirectoryPicker({ mode: 'readwrite' });
+        const lista = []; await walk(dir, '', lista); await ingest(lista);
+      } catch (e) { if (e.name !== 'AbortError') status('Não consegui abrir a pasta: ' + e.message, true); }
+    } else $('fileDir').click();
+  };
+  $('fileDir').onchange = async e => {
+    const lista = [...e.target.files].filter(f => f.name.endsWith('.md')).map(f => ({
+      path: f.webkitRelativePath.split('/').slice(1).join('/'), nome: f.name.replace(/\.md$/, ''), file: f, handle: null,
+    })).filter(it => !it.path.split('/').some(p => IGNORE.test(p)));
+    await ingest(lista);
+  };
+  $('scope').oninput = () => render();
+  const noEscopo = n => !$('scope').value.trim() || n.path.toLowerCase().includes($('scope').value.trim().toLowerCase());
+
+  /* ---------- gravação ---------- */
+  function atualizaTexto(n, campos) {
+    let t = n.text;
+    t = t.replace(/^(---\r?\n)([\s\S]*?)(\r?\n---)/, (_, a, fm, c) => {
+      for (const [k, v] of Object.entries(campos)) {
+        const re = new RegExp('^(' + k + ':\\s*).*$', 'm');
+        fm = re.test(fm) ? fm.replace(re, `$1${v}`) : fm + `\n${k}: ${v}`;
+      }
+      return a + fm + c;
+    });
+    if ('dia_atual' in campos && n.fm.tipo === 'relógio') {
+      const prazo = Number(n.fm.dia_prazo);
+      t = t.replace(/(\*\*Dia atual:\*\*\s*)-?\d+/, `$1${campos.dia_atual}`)
+           .replace(/(\*\*Dias restantes:\*\*\s*)-?\d+/, `$1${prazo - campos.dia_atual}`);
+    }
+    n.text = t; Object.assign(n.fm, campos);
+  }
+  async function grava(n) {
+    if (n.handle && n.handle.createWritable) {
+      try { const w = await n.handle.createWritable(); await w.write(n.text); await w.close(); n.dirty = false; status(`Gravado: ${n.nome}`); return; }
+      catch (e) { status('Falha ao gravar: ' + e.message, true); }
+    }
+    n.dirty = true; status('Alterado só na memória — use "Baixar nota" para salvar no vault', true);
+  }
+  function baixa(n) {
+    const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([n.text], { type: 'text/markdown' }));
+    a.download = n.nome + '.md'; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 2000); n.dirty = false; render();
+  }
+
+  /* ---------- modelo ---------- */
+  function relogios() {
+    const doVault = notas.filter(n => n.fm.tipo === 'relógio' && noEscopo(n)).map(n => ({
+      key: 'n:' + n.path, nome: n.nome, prazo: Number(n.fm.dia_prazo) || 7, atual: Number(n.fm.dia_atual) || 1,
+      estado: n.fm.estado || 'ativo', nota: n, sub: n.fm.prazo || '',
+    }));
+    const man = manuais.map(m => ({ key: 'm:' + m.id, nome: m.nome, prazo: m.prazo, atual: m.atual, estado: m.estado || 'ativo', manual: m, sub: m.cons || '' }));
+    return [...doVault, ...man];
+  }
+  function mudaDia(r, delta) {
+    const novo = Math.max(0, Math.min(r.prazo, r.atual + delta));
+    if (novo === r.atual) return;
+    if (r.manual) { r.manual.atual = novo; saveManuais(); render(); return; }
+    atualizaTexto(r.nota, { dia_atual: novo }); render(); grava(r.nota).then(render);
+  }
+
+  /* ---------- anel segmentado ---------- */
+  function anel(r) {
+    const n = r.prazo, cx = 85, cy = 85, R = 70, rin = 50, gap = n > 1 ? 0.06 : 0;
+    const frac = r.atual / n;
+    const cor = r.atual >= n ? 'var(--bad)' : frac >= 0.7 ? 'var(--bad)' : frac >= 0.45 ? 'var(--warn)' : 'var(--ok)';
+    let segs = '';
+    for (let i = 0; i < n; i++) {
+      const a0 = (i / n) * 2 * Math.PI - Math.PI / 2 + gap, a1 = ((i + 1) / n) * 2 * Math.PI - Math.PI / 2 - gap;
+      const p = (a, rad) => `${(cx + rad * Math.cos(a)).toFixed(2)} ${(cy + rad * Math.sin(a)).toFixed(2)}`;
+      const large = a1 - a0 > Math.PI ? 1 : 0;
+      segs += `<path class="seg" d="M${p(a0, R)} A${R} ${R} 0 ${large} 1 ${p(a1, R)} L${p(a1, rin)} A${rin} ${rin} 0 ${large} 0 ${p(a0, rin)}Z" fill="${i < r.atual ? cor : '#3a3027'}"/>`;
+    }
+    const falta = r.prazo - r.atual;
+    return `<svg viewBox="0 0 170 170">${segs}
+      ${falta > 0 ? `<text x="85" y="88" text-anchor="middle" class="big">${falta}</text>` : '<path class="caveira" transform="translate(63 52) scale(1.85)" d="M12 3a8 8 0 00-5 14.2V20h3.2v-2h3.6v2H17v-2.8A8 8 0 0012 3z M9 11.2a1.3 1.3 0 100 .01 M15 11.2a1.3 1.3 0 100 .01 M12 14l-1 1.8h2z"/>'}
+      <text x="85" y="106" text-anchor="middle" class="small">${falta > 0 ? (falta === 1 ? 'dia restante' : 'dias restantes') : 'prazo estourou'}</text>
+      <text x="85" y="122" text-anchor="middle" class="small">dia ${r.atual} de ${r.prazo}</text></svg>`;
+  }
+
+  /* ---------- render ---------- */
+  function render() {
+    const rs = relogios();
+    const temAlgo = rs.length || notas.length;
+    $('empty').hidden = !!temAlgo; $('app').hidden = !temAlgo;
+    if (!temAlgo) return;
+    if (!rs.find(r => r.key === selecionado)) selecionado = rs[0]?.key ?? null;
+    const sel = rs.find(r => r.key === selecionado);
+    const hoje = sel ? sel.atual : null;
+
+    $('clocks').innerHTML = rs.length ? rs.map(r => `
+      <div class="clock ${r.key === selecionado ? 'sel' : ''}" data-key="${esc(r.key)}">
+        <span class="tag ${r.manual ? 'manual' : ''}">${r.manual ? 'manual' : esc(r.estado)}</span>
+        <h3>${esc(r.nome)}</h3><div class="sub">${esc(r.sub)}</div>
+        ${anel(r)}
+        <div class="ctrl"><button data-a="menos" title="Voltar um dia">−</button><b>Dia ${r.atual}</b><button data-a="mais" title="Avançar um dia" class="primary"><span class="ico i-mais"></span>dia</button></div>
+        <div class="link">
+          ${r.nota && r.nota.dirty ? `<span class="dirty">não salvo</span><button data-a="baixar">Baixar nota</button>` : ''}
+          ${r.manual ? `<button data-a="apagar">Excluir</button>` : ''}
+        </div>
+      </div>`).join('') : '<div class="empty" style="grid-column:1/-1">Nenhum relógio encontrado neste escopo.</div>';
+
+    // linha do tempo
+    const eventos = notas.filter(n => n.fm.tipo === 'evento' && noEscopo(n) && Number.isFinite(Number(n.fm.dia)));
+    const missoes = notas.filter(n => String(n.fm.tipo).startsWith('missão') && noEscopo(n) && n.fm.dia_prazo != null);
+    const maxDia = Math.max(sel ? sel.prazo : 1, ...eventos.map(n => Number(n.fm.dia)), ...missoes.map(n => Number(n.fm.dia_prazo)), 1);
+    $('tlTitle').textContent = sel ? `Linha do tempo — hoje: dia ${hoje} (${sel.nome})` : 'Linha do tempo';
+    let tl = '';
+    for (let d = 1; d <= maxDia; d++) {
+      const evs = eventos.filter(n => Number(n.fm.dia) === d), mis = missoes.filter(n => Number(n.fm.dia_prazo) === d);
+      const classe = hoje == null ? '' : d === hoje ? 'today' : d < hoje ? 'past' : '';
+      tl += `<div class="day ${classe}"><div class="n"><span>Dia ${d}</span><span>${d === hoje ? 'hoje' : ''}</span></div>` +
+        evs.map(n => {
+          const pend = n.fm.estado === 'pendente', atr = pend && hoje != null && d < hoje;
+          return `<button class="chip evento ${esc(n.fm.estado)} ${atr ? 'atrasado' : ''}" data-ev="${esc(n.path)}" title="Clique para alternar pendente/ocorrido">
+            ${esc(n.nome.replace(/^Dia \d+\s*[-—]\s*/, ''))}<small>${atr ? 'atrasado — ' : ''}${esc(n.fm.estado)}${n.fm.local ? ' · ' + esc(limpaLink(n.fm.local)) : ''}</small></button>`;
+        }).join('') +
+        mis.map(n => {
+          const aberta = !['concluída', 'falhou'].includes(n.fm.estado), venc = aberta && hoje != null && d < hoje;
+          return `<div class="chip missao ${venc ? 'vencida' : ''}">⚑ ${esc(n.nome)}<small>prazo · ${esc(n.fm.estado)}</small></div>`;
+        }).join('') + '</div>';
+    }
+    $('timeline').innerHTML = tl;
+
+    // tabela de missões
+    $('missions').innerHTML = missoes.length ? `<table><tr><th>Missão</th><th>Tipo</th><th>Prazo</th><th>Faltam</th><th>Estado</th></tr>` +
+      missoes.sort((a, b) => a.fm.dia_prazo - b.fm.dia_prazo).map(n => {
+        const aberta = !['concluída', 'falhou'].includes(n.fm.estado), falta = hoje != null ? n.fm.dia_prazo - hoje : null;
+        const pill = !aberta ? `<span class="pill ok">${esc(n.fm.estado)}</span>` : falta != null && falta < 0 ? '<span class="pill bad">vencida</span>' : `<span class="pill warn">${esc(n.fm.estado)}</span>`;
+        return `<tr><td>${esc(n.nome)}</td><td>${esc(n.fm.tipo)}</td><td>Dia ${n.fm.dia_prazo}</td><td>${falta == null ? '—' : falta}</td><td>${pill}</td></tr>`;
+      }).join('') + '</table>' : '<div class="empty">Nenhuma missão com <code>dia_prazo</code>.</div>';
+  }
+
+  $('clocks').onclick = e => {
+    const card = e.target.closest('.clock'); if (!card) return;
+    const r = relogios().find(r => r.key === card.dataset.key); if (!r) return;
+    const a = e.target.closest('button')?.dataset.a;
+    if (a === 'mais') mudaDia(r, 1);
+    else if (a === 'menos') mudaDia(r, -1);
+    else if (a === 'baixar') baixa(r.nota);
+    else if (a === 'apagar') { if (confirm(`Excluir "${r.nome}"?`)) { manuais = manuais.filter(m => m !== r.manual); saveManuais(); render(); } }
+    else { selecionado = r.key; render(); }
+  };
+  $('timeline').onclick = e => {
+    const b = e.target.closest('[data-ev]'); if (!b) return;
+    const n = notas.find(n => n.path === b.dataset.ev); if (!n) return;
+    atualizaTexto(n, { estado: n.fm.estado === 'pendente' ? 'ocorrido' : 'pendente' });
+    render(); grava(n).then(render);
+  };
+
+  $('btnNew').onclick = () => $('dlgNew').showModal();
+  $('formNew').onsubmit = e => {
+    if (e.submitter?.value !== 'ok') return;
+    manuais.push({ id: Math.random().toString(36).slice(2, 8), nome: $('nNome').value.trim(), prazo: Math.max(2, +$('nPrazo').value || 7), atual: 1, cons: $('nCons').value.trim() });
+    saveManuais(); $('formNew').reset(); $('nPrazo').value = 7; render();
+  };
+  render();
+})();
+</script>
+</body>
+</html>
